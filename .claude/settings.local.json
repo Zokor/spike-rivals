@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun run build:*)",
+      "Bash(bun run typecheck:*)",
+      "Bash(identify:*)",
+      "Bash(sips:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill -9)",
+      "Bash(bun update:*)",
+      "Bash(npx skills:*)"
+    ]
+  }
+}

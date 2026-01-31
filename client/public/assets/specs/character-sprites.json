@@ -1,0 +1,257 @@
+{
+  "meta": {
+    "name": "Character Sprite Specifications",
+    "version": "1.0.0",
+    "description": "Pixel art sprite sheet specifications for Spike Rivals characters"
+  },
+  "dimensions": {
+    "characterSize": { "width": 24, "height": 32 },
+    "spriteSheet": { "width": 240, "height": 128 },
+    "columns": 10,
+    "rows": 4
+  },
+  "animations": [
+    {
+      "name": "idle",
+      "frames": 4,
+      "loop": true,
+      "row": 0,
+      "startCol": 0,
+      "fps": 6,
+      "description": "Standing position with slight breathing motion"
+    },
+    {
+      "name": "run",
+      "frames": 6,
+      "loop": true,
+      "row": 0,
+      "startCol": 4,
+      "fps": 12,
+      "description": "Running cycle animation"
+    },
+    {
+      "name": "jump",
+      "frames": 3,
+      "loop": false,
+      "row": 1,
+      "startCol": 0,
+      "fps": 10,
+      "description": "Crouch, rise, peak - jump sequence"
+    },
+    {
+      "name": "fall",
+      "frames": 2,
+      "loop": false,
+      "row": 1,
+      "startCol": 3,
+      "fps": 8,
+      "description": "Falling and landing"
+    },
+    {
+      "name": "hit",
+      "frames": 4,
+      "loop": false,
+      "row": 1,
+      "startCol": 5,
+      "fps": 15,
+      "description": "Wind up, swing, follow through, recover"
+    },
+    {
+      "name": "spike",
+      "frames": 4,
+      "loop": false,
+      "row": 2,
+      "startCol": 0,
+      "fps": 18,
+      "description": "Jumping spike attack - powerful overhead hit"
+    },
+    {
+      "name": "dive",
+      "frames": 3,
+      "loop": false,
+      "row": 2,
+      "startCol": 4,
+      "fps": 12,
+      "description": "Diving save attempt"
+    },
+    {
+      "name": "victory",
+      "frames": 4,
+      "loop": true,
+      "row": 3,
+      "startCol": 0,
+      "fps": 8,
+      "description": "Celebration pose animation"
+    },
+    {
+      "name": "defeat",
+      "frames": 2,
+      "loop": false,
+      "row": 3,
+      "startCol": 4,
+      "fps": 4,
+      "description": "Sad/disappointed pose"
+    },
+    {
+      "name": "serve",
+      "frames": 4,
+      "loop": false,
+      "row": 3,
+      "startCol": 6,
+      "fps": 12,
+      "description": "Serving the ball animation"
+    }
+  ],
+  "colorPalettes": {
+    "maxColorsPerCharacter": 16,
+    "structure": {
+      "skinTones": 3,
+      "outfit": 4,
+      "hair": 3,
+      "outline": 1,
+      "accent": 2,
+      "shadow": 2,
+      "highlight": 1
+    }
+  },
+  "characters": [
+    {
+      "id": "blitz",
+      "name": "Blitz",
+      "playstyle": "Speedster - fast movement, balanced",
+      "palette": {
+        "primary": "#3498db",
+        "secondary": "#2980b9",
+        "accent": "#f39c12",
+        "skin": ["#f5d6ba", "#e5c4a8", "#c9a886"],
+        "hair": ["#2c3e50", "#34495e", "#5d6d7e"],
+        "outline": "#1a252f"
+      },
+      "visualNotes": "Athletic build, spiky blue hair, lightning bolt motif on outfit"
+    },
+    {
+      "id": "crusher",
+      "name": "Crusher",
+      "playstyle": "Power hitter - slow but devastating spikes",
+      "palette": {
+        "primary": "#e74c3c",
+        "secondary": "#c0392b",
+        "accent": "#f1c40f",
+        "skin": ["#d4a574", "#c49464", "#a67c52"],
+        "hair": ["#2c2c2c", "#3d3d3d", "#4a4a4a"],
+        "outline": "#1a1a1a"
+      },
+      "visualNotes": "Large muscular build, short dark hair, fist/power motif"
+    },
+    {
+      "id": "sky",
+      "name": "Sky",
+      "playstyle": "High flyer - dominates the net",
+      "palette": {
+        "primary": "#9b59b6",
+        "secondary": "#8e44ad",
+        "accent": "#00d4ff",
+        "skin": ["#fce0c5", "#f5d0b0", "#deb896"],
+        "hair": ["#ffffff", "#e8e8e8", "#d0d0d0"],
+        "outline": "#2c1e3d"
+      },
+      "visualNotes": "Tall slender build, flowing white hair, cloud/wing motifs"
+    },
+    {
+      "id": "zen",
+      "name": "Zen",
+      "playstyle": "Precision - perfect ball placement",
+      "palette": {
+        "primary": "#27ae60",
+        "secondary": "#1e8449",
+        "accent": "#ecf0f1",
+        "skin": ["#fdd9b5", "#deb887", "#c49a6c"],
+        "hair": ["#1a1a1a", "#2d2d2d", "#404040"],
+        "outline": "#0d3320"
+      },
+      "visualNotes": "Medium build, calm expression, minimal clean design, zen circle motif"
+    },
+    {
+      "id": "tank",
+      "name": "Tank",
+      "playstyle": "All-rounder defensive",
+      "palette": {
+        "primary": "#7f8c8d",
+        "secondary": "#616a6b",
+        "accent": "#f39c12",
+        "skin": ["#e8beac", "#d4a596", "#bc8f80"],
+        "hair": ["#5d4e37", "#4a3f2c", "#3d3428"],
+        "outline": "#2c3e50"
+      },
+      "visualNotes": "Stocky defensive build, protective stance, shield motif"
+    },
+    {
+      "id": "flash",
+      "name": "Flash",
+      "playstyle": "Ultra speed - can reach any ball",
+      "palette": {
+        "primary": "#f1c40f",
+        "secondary": "#f39c12",
+        "accent": "#e74c3c",
+        "skin": ["#fdd7c4", "#f5c7b4", "#deb09a"],
+        "hair": ["#f39c12", "#e67e22", "#d35400"],
+        "outline": "#7d5a00"
+      },
+      "visualNotes": "Lean athletic build, orange flame-like hair, speed lines motif"
+    },
+    {
+      "id": "nova",
+      "name": "Nova",
+      "playstyle": "Balanced - good at everything",
+      "palette": {
+        "primary": "#e91e63",
+        "secondary": "#c2185b",
+        "accent": "#ffc107",
+        "skin": ["#d4a574", "#c49464", "#a67c52"],
+        "hair": ["#880e4f", "#ad1457", "#c2185b"],
+        "outline": "#4a0a2a"
+      },
+      "visualNotes": "Medium athletic build, star/nova burst motif, confident pose"
+    },
+    {
+      "id": "ghost",
+      "name": "Ghost",
+      "playstyle": "Tricky - unpredictable movements",
+      "palette": {
+        "primary": "#1abc9c",
+        "secondary": "#16a085",
+        "accent": "#8e44ad",
+        "skin": ["#f0e6dc", "#e0d6cc", "#c8beb4"],
+        "hair": ["#95a5a6", "#7f8c8d", "#6c7a7a"],
+        "outline": "#0d4d40"
+      },
+      "visualNotes": "Mysterious aura, semi-transparent effects, wisp/smoke motifs"
+    }
+  ],
+  "styleGuidelines": {
+    "antialiasing": false,
+    "lightSource": "top-left",
+    "proportions": "Exaggerated - larger head (8-10px), smaller body for readability",
+    "silhouette": "Each animation should have a clear, distinct silhouette",
+    "outlines": "1px dark outline (not pure black), slightly lighter for internal details",
+    "subpixel": false,
+    "dithering": "Minimal, only for gradients if needed"
+  },
+  "exportSettings": {
+    "format": "PNG",
+    "transparency": true,
+    "colorDepth": "32-bit RGBA",
+    "naming": "{character}-{variant}.png"
+  },
+  "skinVariants": {
+    "description": "Each character can have multiple skin variants",
+    "types": [
+      { "id": "default", "rarity": "common", "description": "Base character appearance" },
+      { "id": "alt1", "rarity": "rare", "description": "Alternative color palette" },
+      { "id": "alt2", "rarity": "rare", "description": "Secondary alternative colors" },
+      { "id": "cyber", "rarity": "epic", "description": "Cyberpunk themed with neon accents" },
+      { "id": "retro", "rarity": "epic", "description": "80s arcade style" },
+      { "id": "legendary", "rarity": "legendary", "description": "Unique visual effects and animations" }
+    ]
+  }
+}

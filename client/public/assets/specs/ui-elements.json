@@ -1,0 +1,356 @@
+{
+  "meta": {
+    "name": "UI Elements Specifications",
+    "version": "1.0.0",
+    "description": "Pixel art UI kit specifications for Spike Rivals"
+  },
+  "colorPalette": {
+    "background": {
+      "primary": "#1a1a2e",
+      "secondary": "#16213e",
+      "tertiary": "#0f3460"
+    },
+    "accent": {
+      "primary": "#e94560",
+      "secondary": "#00ff9f",
+      "tertiary": "#f1c40f"
+    },
+    "text": {
+      "primary": "#ffffff",
+      "secondary": "#bdc3c7",
+      "disabled": "#7f8c8d"
+    },
+    "status": {
+      "success": "#2ecc71",
+      "warning": "#f39c12",
+      "error": "#e74c3c",
+      "info": "#3498db"
+    },
+    "rarity": {
+      "common": "#95a5a6",
+      "rare": "#3498db",
+      "epic": "#9b59b6",
+      "legendary": "#f1c40f"
+    }
+  },
+  "typography": {
+    "fonts": [
+      {
+        "name": "Press Start 2P",
+        "usage": "Headings, scores, important text",
+        "url": "https://fonts.google.com/specimen/Press+Start+2P"
+      },
+      {
+        "name": "Pixelify Sans",
+        "usage": "Body text, descriptions",
+        "url": "https://fonts.google.com/specimen/Pixelify+Sans"
+      }
+    ],
+    "sizes": {
+      "xs": 8,
+      "sm": 12,
+      "md": 16,
+      "lg": 24,
+      "xl": 32
+    }
+  },
+  "buttons": {
+    "primary": {
+      "dimensions": { "width": 64, "height": 24 },
+      "states": {
+        "normal": {
+          "background": "#e94560",
+          "border": "#c0392b",
+          "text": "#ffffff"
+        },
+        "hover": {
+          "background": "#ff6b7a",
+          "border": "#e94560",
+          "text": "#ffffff",
+          "effect": "slight-scale-up"
+        },
+        "pressed": {
+          "background": "#c0392b",
+          "border": "#a02a20",
+          "text": "#ffffff",
+          "offset": { "y": 2 }
+        },
+        "disabled": {
+          "background": "#7f8c8d",
+          "border": "#6c7a7a",
+          "text": "#bdc3c7"
+        }
+      },
+      "borderWidth": 2,
+      "borderRadius": 4,
+      "shadowOffset": 3
+    },
+    "secondary": {
+      "dimensions": { "width": 48, "height": 20 },
+      "states": {
+        "normal": {
+          "background": "#16213e",
+          "border": "#0f3460",
+          "text": "#ffffff"
+        },
+        "hover": {
+          "background": "#1a2a4a",
+          "border": "#16213e",
+          "text": "#00ff9f"
+        },
+        "pressed": {
+          "background": "#0f3460",
+          "border": "#0a2040",
+          "text": "#ffffff"
+        }
+      }
+    },
+    "icon": {
+      "dimensions": { "width": 24, "height": 24 },
+      "states": {
+        "normal": { "background": "transparent", "iconColor": "#ffffff" },
+        "hover": { "background": "#16213e", "iconColor": "#00ff9f" },
+        "pressed": { "background": "#0f3460", "iconColor": "#ffffff" }
+      }
+    },
+    "currency": {
+      "dimensions": { "width": 80, "height": 28 },
+      "layout": "icon-left",
+      "iconSize": 16,
+      "description": "Button showing currency cost with icon"
+    }
+  },
+  "panels": {
+    "default": {
+      "nineSlice": { "corner": 16, "edge": 8 },
+      "background": "#1a1a2e",
+      "border": "#16213e",
+      "borderWidth": 2,
+      "padding": 8
+    },
+    "modal": {
+      "nineSlice": { "corner": 20, "edge": 10 },
+      "background": "#0f3460",
+      "border": "#e94560",
+      "borderWidth": 3,
+      "header": {
+        "height": 32,
+        "background": "#e94560",
+        "textColor": "#ffffff"
+      }
+    },
+    "tooltip": {
+      "nineSlice": { "corner": 8, "edge": 4 },
+      "background": "#000000",
+      "border": "#ffffff",
+      "borderWidth": 1,
+      "opacity": 0.9,
+      "maxWidth": 160
+    },
+    "notification": {
+      "dimensions": { "width": 200, "height": 48 },
+      "slideIn": "from-top",
+      "duration": 3000
+    }
+  },
+  "icons": {
+    "dimensions": { "width": 16, "height": 16 },
+    "categories": {
+      "currency": [
+        { "id": "coin", "colors": ["#f1c40f", "#f39c12", "#d68910"] },
+        { "id": "gem", "colors": ["#00f5d4", "#00bbf9", "#0077b6"] },
+        { "id": "xp", "colors": ["#9b59b6", "#8e44ad", "#6c3483"] }
+      ],
+      "system": [
+        { "id": "settings", "description": "Gear/cog icon" },
+        { "id": "sound-on", "description": "Speaker with waves" },
+        { "id": "sound-off", "description": "Speaker with X" },
+        { "id": "music-on", "description": "Musical note" },
+        { "id": "music-off", "description": "Musical note with X" },
+        { "id": "fullscreen", "description": "Expand arrows" },
+        { "id": "exit", "description": "Door with arrow" }
+      ],
+      "gameplay": [
+        { "id": "play", "description": "Triangle play button" },
+        { "id": "pause", "description": "Two vertical bars" },
+        { "id": "restart", "description": "Circular arrow" },
+        { "id": "home", "description": "House icon" },
+        { "id": "versus", "description": "VS text or crossed swords" }
+      ],
+      "attributes": [
+        { "id": "speed", "colors": ["#3498db"], "description": "Lightning bolt or running figure" },
+        { "id": "jump", "colors": ["#9b59b6"], "description": "Up arrow or spring" },
+        { "id": "power", "colors": ["#e74c3c"], "description": "Fist or explosion" },
+        { "id": "control", "colors": ["#2ecc71"], "description": "Crosshair or target" }
+      ],
+      "ranks": [
+        { "id": "rookie", "color": "#95a5a6", "description": "Basic shield" },
+        { "id": "bronze", "color": "#cd7f32", "description": "Bronze shield with star" },
+        { "id": "silver", "color": "#c0c0c0", "description": "Silver shield with 2 stars" },
+        { "id": "gold", "color": "#ffd700", "description": "Gold shield with crown" },
+        { "id": "platinum", "color": "#00d4ff", "description": "Platinum shield with wings" },
+        { "id": "diamond", "color": "#b9f2ff", "description": "Diamond shape" },
+        { "id": "champion", "color": "#ff6b35", "description": "Crown with flames" }
+      ],
+      "shop": [
+        { "id": "cart", "description": "Shopping cart" },
+        { "id": "owned", "description": "Checkmark in circle" },
+        { "id": "locked", "description": "Padlock" },
+        { "id": "new", "description": "Star burst" },
+        { "id": "sale", "description": "Percentage or tag" }
+      ],
+      "social": [
+        { "id": "friend", "description": "Two people" },
+        { "id": "add-friend", "description": "Person with plus" },
+        { "id": "message", "description": "Chat bubble" },
+        { "id": "invite", "description": "Envelope" }
+      ]
+    }
+  },
+  "bars": {
+    "health": {
+      "dimensions": { "width": 100, "height": 12 },
+      "background": "#1a1a2e",
+      "border": "#ffffff",
+      "borderWidth": 1,
+      "fill": {
+        "full": "#2ecc71",
+        "medium": "#f39c12",
+        "low": "#e74c3c"
+      },
+      "segments": false
+    },
+    "xp": {
+      "dimensions": { "width": 200, "height": 16 },
+      "background": "#16213e",
+      "border": "#9b59b6",
+      "borderWidth": 2,
+      "fill": "#9b59b6",
+      "fillGradient": ["#9b59b6", "#8e44ad"],
+      "showText": true
+    },
+    "attribute": {
+      "dimensions": { "width": 60, "height": 8 },
+      "background": "#1a1a2e",
+      "border": null,
+      "segments": 8,
+      "segmentGap": 2,
+      "colors": {
+        "speed": "#3498db",
+        "jump": "#9b59b6",
+        "power": "#e74c3c",
+        "control": "#2ecc71"
+      }
+    },
+    "timer": {
+      "dimensions": { "width": 120, "height": 20 },
+      "style": "countdown",
+      "warningThreshold": 10,
+      "warningColor": "#e74c3c",
+      "pulseOnWarning": true
+    }
+  },
+  "scoreDisplay": {
+    "dimensions": { "width": 160, "height": 48 },
+    "layout": "player1-vs-player2",
+    "scoreSize": 32,
+    "nameSize": 12,
+    "divider": {
+      "text": "VS",
+      "color": "#e94560"
+    },
+    "animation": {
+      "onScoreChange": "pop-scale",
+      "duration": 300
+    }
+  },
+  "characterCard": {
+    "dimensions": { "width": 120, "height": 160 },
+    "layout": {
+      "portrait": { "width": 80, "height": 80, "y": 8 },
+      "nameArea": { "height": 24 },
+      "attributeArea": { "height": 48 }
+    },
+    "states": {
+      "normal": { "border": "#16213e" },
+      "selected": { "border": "#00ff9f", "glow": true },
+      "locked": { "overlay": "#000000", "overlayOpacity": 0.7 }
+    }
+  },
+  "shopItem": {
+    "dimensions": { "width": 100, "height": 140 },
+    "layout": {
+      "image": { "width": 80, "height": 80 },
+      "name": { "height": 20 },
+      "price": { "height": 24 }
+    },
+    "rarityBorder": true,
+    "saleTag": {
+      "position": "top-right",
+      "rotation": 15
+    }
+  },
+  "battlePassTier": {
+    "dimensions": { "width": 80, "height": 100 },
+    "freeReward": { "y": 10, "size": 40 },
+    "premiumReward": { "y": 55, "size": 40 },
+    "tierNumber": { "y": 95, "size": 12 },
+    "lockIcon": { "size": 16 },
+    "premiumLock": {
+      "overlay": "#ffd700",
+      "overlayOpacity": 0.3
+    }
+  },
+  "matchmaking": {
+    "searchingAnimation": {
+      "type": "pulse",
+      "frames": 4,
+      "fps": 2
+    },
+    "playerCard": {
+      "width": 180,
+      "height": 60,
+      "showRank": true,
+      "showElo": true
+    },
+    "vsAnimation": {
+      "type": "slide-in",
+      "duration": 500
+    }
+  },
+  "loadingSpinner": {
+    "dimensions": { "width": 32, "height": 32 },
+    "frames": 8,
+    "fps": 12,
+    "style": "volleyball-spin"
+  },
+  "toast": {
+    "dimensions": { "width": 240, "height": 48 },
+    "types": {
+      "success": { "icon": "checkmark", "border": "#2ecc71" },
+      "error": { "icon": "x-mark", "border": "#e74c3c" },
+      "info": { "icon": "info", "border": "#3498db" },
+      "reward": { "icon": "star", "border": "#f1c40f" }
+    },
+    "animation": {
+      "enter": "slide-from-top",
+      "exit": "fade-out",
+      "duration": 300
+    }
+  },
+  "inputField": {
+    "dimensions": { "width": 200, "height": 32 },
+    "background": "#0f3460",
+    "border": "#16213e",
+    "borderFocused": "#00ff9f",
+    "placeholder": "#7f8c8d",
+    "text": "#ffffff",
+    "caretColor": "#00ff9f"
+  },
+  "exportSettings": {
+    "format": "PNG",
+    "transparency": true,
+    "atlasGeneration": true,
+    "naming": "ui-{category}-{element}.png"
+  }
+}

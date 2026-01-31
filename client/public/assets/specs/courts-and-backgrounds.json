@@ -1,0 +1,420 @@
+{
+  "meta": {
+    "name": "Courts and Backgrounds Specifications",
+    "version": "1.0.0",
+    "description": "Pixel art specifications for volleyball courts and parallax backgrounds"
+  },
+  "dimensions": {
+    "game": { "width": 480, "height": 270 },
+    "upscaled": { "width": 960, "height": 540, "note": "2x for high-DPI displays" }
+  },
+  "courtLayout": {
+    "groundY": 230,
+    "netPosition": { "x": 240 },
+    "netHeight": 80,
+    "netWidth": 6,
+    "courtBoundaries": { "left": 20, "right": 460 },
+    "playableHeight": 210
+  },
+  "parallaxLayers": {
+    "description": "Each background has 4-5 parallax layers",
+    "layers": [
+      { "id": 1, "name": "far", "speedMultiplier": 0.1, "description": "Sky, distant buildings" },
+      { "id": 2, "name": "mid-far", "speedMultiplier": 0.3, "description": "Medium structures" },
+      { "id": 3, "name": "mid", "speedMultiplier": 0.5, "description": "Near structures, decorations" },
+      { "id": 4, "name": "ground", "speedMultiplier": 1.0, "description": "Court surface" },
+      { "id": 5, "name": "foreground", "speedMultiplier": 1.2, "description": "Effects, particles" }
+    ]
+  },
+  "backgrounds": [
+    {
+      "id": "neon-district",
+      "name": "Neon District",
+      "theme": "Cyberpunk",
+      "description": "Rooftop court with neon signs, rain, flying cars",
+      "palette": ["#0d0221", "#0f084b", "#26408b", "#a6cee3", "#ff006e", "#00f5d4"],
+      "layers": [
+        {
+          "id": 1,
+          "elements": ["Night sky gradient", "Distant skyscrapers", "Tiny window lights", "Light pollution glow"]
+        },
+        {
+          "id": 2,
+          "elements": ["Medium buildings", "Large neon signs (Japanese/Chinese)", "Holographic advertisements"]
+        },
+        {
+          "id": 3,
+          "elements": ["Rooftop AC units", "Antennas", "Railings", "Steam vents"]
+        },
+        {
+          "id": 4,
+          "elements": ["Metal/concrete floor", "Painted court lines (cyan)", "Net posts with neon accent"]
+        },
+        {
+          "id": 5,
+          "elements": ["Rain particles", "Steam effects", "Neon reflections on wet floor"]
+        }
+      ],
+      "animations": [
+        { "element": "neon-signs", "type": "flicker", "frames": 4, "fps": 6 },
+        { "element": "flying-cars", "type": "parallax-move", "direction": "left-to-right" },
+        { "element": "rain", "type": "particle-fall", "density": "high" },
+        { "element": "holograms", "type": "glitch", "frames": 3, "fps": 4 }
+      ],
+      "netStyle": "holographic",
+      "groundTexture": "wet-metal"
+    },
+    {
+      "id": "cyber-arena",
+      "name": "Cyber Arena",
+      "theme": "Cyberpunk",
+      "description": "Indoor holographic stadium with digital crowd",
+      "palette": ["#000000", "#1a1a2e", "#16213e", "#0f3460", "#e94560", "#00ff9f"],
+      "layers": [
+        {
+          "id": 1,
+          "elements": ["Back wall with hexagonal panels", "Giant screens showing stats"]
+        },
+        {
+          "id": 2,
+          "elements": ["Holographic crowd silhouettes", "Digital banners", "Sponsor logos"]
+        },
+        {
+          "id": 3,
+          "elements": ["Stadium structure", "Ceiling beams", "Spotlights", "Camera drones"]
+        },
+        {
+          "id": 4,
+          "elements": ["Glossy black floor", "Cyan court lines", "Center logo", "Energy net"]
+        },
+        {
+          "id": 5,
+          "elements": ["Floating AR displays", "Subtle scan lines", "Lens flares"]
+        }
+      ],
+      "animations": [
+        { "element": "crowd", "type": "wave", "frames": 4, "fps": 4 },
+        { "element": "screens", "type": "cycle-images", "interval": 3000 },
+        { "element": "drones", "type": "hover", "frames": 2, "fps": 2 },
+        { "element": "scan-lines", "type": "scroll-down", "speed": 50 },
+        { "element": "spotlights", "type": "rotate", "speed": 20 }
+      ],
+      "netStyle": "energy-barrier",
+      "groundTexture": "glossy-black"
+    },
+    {
+      "id": "night-market",
+      "name": "Night Market",
+      "theme": "Cyberpunk",
+      "description": "Street court in Asian night market",
+      "palette": ["#1a0a0a", "#2d132c", "#801336", "#c72c41", "#ee4540", "#ffd369"],
+      "layers": [
+        {
+          "id": 1,
+          "elements": ["Dark sky", "Apartment buildings with lit windows"]
+        },
+        {
+          "id": 2,
+          "elements": ["Far food stalls", "Vertical neon signs", "Hanging red lanterns"]
+        },
+        {
+          "id": 3,
+          "elements": ["Detailed food stalls", "Steam from vendors", "Customer silhouettes", "Holographic menus", "Cables overhead"]
+        },
+        {
+          "id": 4,
+          "elements": ["Cracked concrete court", "Spray-painted lines", "Makeshift net with rope"]
+        },
+        {
+          "id": 5,
+          "elements": ["Steam particles", "Occasional flyer blowing", "Puddle reflections"]
+        }
+      ],
+      "animations": [
+        { "element": "lanterns", "type": "sway", "frames": 3, "fps": 3 },
+        { "element": "steam", "type": "rise", "continuous": true },
+        { "element": "neon-signs", "type": "flicker", "frames": 3, "fps": 5 },
+        { "element": "holo-menus", "type": "rotate", "speed": 10 },
+        { "element": "npcs", "type": "idle-animation", "frames": 2, "fps": 2 }
+      ],
+      "netStyle": "rope-makeshift",
+      "groundTexture": "cracked-concrete"
+    },
+    {
+      "id": "sunset-beach",
+      "name": "Sunset Beach",
+      "theme": "Classic",
+      "description": "Beach volleyball at golden hour",
+      "palette": ["#ff7e5f", "#feb47b", "#ffcb77", "#ffe5b4", "#457b9d", "#f4e4ba", "#e8d5a3"],
+      "layers": [
+        {
+          "id": 1,
+          "elements": ["Gradient sunset sky (orange to pink)", "Wispy clouds", "Sun (low)"]
+        },
+        {
+          "id": 2,
+          "elements": ["Calm ocean", "Distant sailboat", "Sun reflection sparkles"]
+        },
+        {
+          "id": 3,
+          "elements": ["Palm trees", "Beach umbrellas", "Lifeguard tower", "Beach chairs"]
+        },
+        {
+          "id": 4,
+          "elements": ["Sand texture", "White boundary lines", "Professional volleyball net"]
+        },
+        {
+          "id": 5,
+          "elements": ["Wave foam at edges", "Sand particles when moving", "Seagulls flying"]
+        }
+      ],
+      "animations": [
+        { "element": "palm-trees", "type": "sway", "frames": 2, "fps": 2 },
+        { "element": "ocean-waves", "type": "loop", "frames": 3, "fps": 4 },
+        { "element": "sun-sparkles", "type": "twinkle", "frames": 3, "fps": 8 },
+        { "element": "seagulls", "type": "fly-across", "interval": 10000 }
+      ],
+      "netStyle": "professional-white",
+      "groundTexture": "sand"
+    },
+    {
+      "id": "retro-arcade",
+      "name": "Retro Arcade",
+      "theme": "Nostalgic",
+      "description": "Inside an 80s arcade with CRT monitors",
+      "palette": ["#1a1a2e", "#2d2d44", "#ff006e", "#00f5d4", "#ffd700", "#00ff00", "#0066ff"],
+      "layers": [
+        {
+          "id": 1,
+          "elements": ["Back wall with arcade cabinets", "Neon signs: HIGH SCORE, INSERT COIN", "80s posters"]
+        },
+        {
+          "id": 2,
+          "elements": ["More cabinets", "Prize counter with plushies", "Kids playing (silhouettes)"]
+        },
+        {
+          "id": 3,
+          "elements": ["Detailed arcade cabinet", "Pinball machine", "Claw machine"]
+        },
+        {
+          "id": 4,
+          "elements": ["Geometric carpet pattern", "Taped court lines", "Portable net"]
+        },
+        {
+          "id": 5,
+          "elements": ["CRT scan line overlay", "Pixel particles", "INSERT COIN text flash"]
+        }
+      ],
+      "animations": [
+        { "element": "arcade-screens", "type": "show-games", "frames": 8, "fps": 10 },
+        { "element": "neon-signs", "type": "flicker", "frames": 2, "fps": 3 },
+        { "element": "pinball-lights", "type": "cycle", "frames": 4, "fps": 8 },
+        { "element": "crt-scanlines", "type": "scroll", "speed": 30 }
+      ],
+      "netStyle": "portable-plastic",
+      "groundTexture": "carpet-geometric"
+    },
+    {
+      "id": "space-station",
+      "name": "Space Station",
+      "theme": "Sci-Fi",
+      "description": "Zero-G court with Earth visible through windows",
+      "palette": ["#000000", "#0a0a1a", "#1d3557", "#457b9d", "#2ecc71", "#00f5d4", "#ffffff"],
+      "layers": [
+        {
+          "id": 1,
+          "elements": ["Black space void", "Star field", "Distant nebula (subtle)"]
+        },
+        {
+          "id": 2,
+          "elements": ["Large Earth through window", "Atmosphere glow", "Moon visible"]
+        },
+        {
+          "id": 3,
+          "elements": ["Hexagonal window frame", "Other station modules", "Solar panels", "Astronaut (behind glass)"]
+        },
+        {
+          "id": 4,
+          "elements": ["Metal grid floor", "Magnetic blue court lines", "Zero-G indicators"]
+        },
+        {
+          "id": 5,
+          "elements": ["Floating dust particles", "HUD elements", "Passing satellite (occasional)"]
+        }
+      ],
+      "animations": [
+        { "element": "stars", "type": "twinkle", "frames": 2, "fps": 4 },
+        { "element": "earth", "type": "slow-rotate", "speed": 0.1 },
+        { "element": "floating-objects", "type": "drift", "speed": 5 },
+        { "element": "control-panels", "type": "blink", "frames": 2, "fps": 2 },
+        { "element": "energy-net", "type": "pulse", "frames": 3, "fps": 6 }
+      ],
+      "netStyle": "energy-barrier",
+      "groundTexture": "metal-grid"
+    },
+    {
+      "id": "ancient-temple",
+      "name": "Ancient Temple",
+      "theme": "Fantasy",
+      "description": "Mystical ruins with floating stones and magic",
+      "palette": ["#2c3e50", "#8e44ad", "#9b59b6", "#7f8c8d", "#95a5a6", "#00ff9f", "#f39c12", "#27ae60"],
+      "layers": [
+        {
+          "id": 1,
+          "elements": ["Twilight sky", "Two moons", "Aurora-like magical streams"]
+        },
+        {
+          "id": 2,
+          "elements": ["Crumbling towers", "Overgrown vines", "Glowing ancient glyphs"]
+        },
+        {
+          "id": 3,
+          "elements": ["Stone columns", "Carved faces/statues", "Floating stones", "Magical torches (green/purple fire)"]
+        },
+        {
+          "id": 4,
+          "elements": ["Stone tile floor", "Moss in cracks", "Glowing magic court lines"]
+        },
+        {
+          "id": 5,
+          "elements": ["Magical particles floating up", "Fireflies", "Falling leaves"]
+        }
+      ],
+      "animations": [
+        { "element": "floating-stones", "type": "bob", "frames": 4, "fps": 3 },
+        { "element": "magical-fire", "type": "flicker", "frames": 4, "fps": 8 },
+        { "element": "glyphs", "type": "pulse-glow", "frames": 3, "fps": 4 },
+        { "element": "aurora", "type": "wave", "speed": 10 },
+        { "element": "particles", "type": "float-up", "continuous": true },
+        { "element": "fireflies", "type": "drift-random", "count": 8 }
+      ],
+      "netStyle": "magical-energy",
+      "groundTexture": "stone-tiles"
+    },
+    {
+      "id": "urban-rooftop",
+      "name": "Urban Rooftop",
+      "theme": "Modern",
+      "description": "City rooftop at night with skyline view",
+      "palette": ["#1a1a2e", "#16213e", "#0f3460", "#ffd700", "#ff6b35", "#e94560", "#00ff9f", "#ffffff"],
+      "layers": [
+        {
+          "id": 1,
+          "elements": ["Night sky with city glow", "Stars barely visible"]
+        },
+        {
+          "id": 2,
+          "elements": ["Skyline silhouettes", "Lit windows", "Billboard/digital screen"]
+        },
+        {
+          "id": 3,
+          "elements": ["Water tower", "Rooftop garden", "Person watching (silhouette)", "Old couch"]
+        },
+        {
+          "id": 4,
+          "elements": ["Concrete floor with cracks", "Spray-painted lines", "Chain-link net"]
+        },
+        {
+          "id": 5,
+          "elements": ["Steam wisps from vents", "String lights", "Occasional bird"]
+        }
+      ],
+      "animations": [
+        { "element": "string-lights", "type": "sway", "frames": 2, "fps": 2 },
+        { "element": "billboard", "type": "change-images", "interval": 5000 },
+        { "element": "steam", "type": "rise", "continuous": true },
+        { "element": "city-lights", "type": "twinkle", "frames": 2, "fps": 4 }
+      ],
+      "netStyle": "chain-link",
+      "groundTexture": "cracked-concrete"
+    }
+  ],
+  "netStyles": {
+    "professional-white": {
+      "color": "#ffffff",
+      "frames": 1,
+      "description": "Standard volleyball net"
+    },
+    "holographic": {
+      "colors": ["#00f5d4", "#00bbf9"],
+      "frames": 3,
+      "fps": 6,
+      "glow": true,
+      "description": "Translucent energy barrier"
+    },
+    "energy-barrier": {
+      "colors": ["#00ff9f", "#0066ff"],
+      "frames": 4,
+      "fps": 8,
+      "glow": true,
+      "description": "Sci-fi force field net"
+    },
+    "rope-makeshift": {
+      "color": "#8b7355",
+      "frames": 2,
+      "fps": 2,
+      "description": "Worn rope net, slight sway"
+    },
+    "portable-plastic": {
+      "color": "#3498db",
+      "frames": 1,
+      "description": "Cheap plastic recreational net"
+    },
+    "magical-energy": {
+      "colors": ["#9b59b6", "#00ff9f", "#f39c12"],
+      "frames": 4,
+      "fps": 6,
+      "glow": true,
+      "particles": true,
+      "description": "Magical runes forming a barrier"
+    },
+    "chain-link": {
+      "color": "#95a5a6",
+      "frames": 2,
+      "fps": 3,
+      "description": "Urban chain-link fence style"
+    }
+  },
+  "groundTextures": {
+    "sand": {
+      "tile": { "width": 32, "height": 32 },
+      "colors": ["#f4e4ba", "#e8d5a3", "#dcc492"],
+      "footprintEffect": true
+    },
+    "wet-metal": {
+      "tile": { "width": 32, "height": 32 },
+      "colors": ["#34495e", "#2c3e50", "#1a252f"],
+      "reflective": true
+    },
+    "glossy-black": {
+      "tile": { "width": 32, "height": 32 },
+      "colors": ["#1a1a1a", "#0d0d0d", "#000000"],
+      "reflective": true
+    },
+    "cracked-concrete": {
+      "tile": { "width": 32, "height": 32 },
+      "colors": ["#7f8c8d", "#6c7a7a", "#5d6969"],
+      "cracks": true
+    },
+    "carpet-geometric": {
+      "tile": { "width": 32, "height": 32 },
+      "colors": ["#8e44ad", "#3498db", "#e74c3c", "#1a1a2e"],
+      "pattern": "80s-geometric"
+    },
+    "metal-grid": {
+      "tile": { "width": 32, "height": 32 },
+      "colors": ["#2c3e50", "#1a252f", "#34495e"],
+      "gridLines": true
+    },
+    "stone-tiles": {
+      "tile": { "width": 32, "height": 32 },
+      "colors": ["#7f8c8d", "#6c7a7a", "#95a5a6"],
+      "moss": true
+    }
+  },
+  "exportSettings": {
+    "format": "PNG",
+    "transparency": true,
+    "layerNaming": "{background-id}-layer{n}.png"
+  }
+}

@@ -1,0 +1,1 @@
+FROM ghcr.io/joeferner/redis-commander:latest

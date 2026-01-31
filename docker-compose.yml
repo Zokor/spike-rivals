@@ -1,0 +1,29 @@
+name: "spike_rivals_redis_server"
+services:
+
+  redis:
+    build:
+      context: ./dockerfiles
+      dockerfile: redis.dockerfile
+    container_name: spike_rivals_redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "notice"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  redis_commander:
+    build:
+      context: ./dockerfiles
+      dockerfile: redis_commander.dockerfile
+    container_name: spike_rivals_redis_commander
+    restart: unless-stopped
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+      - PORT=8098
+    ports:
+      - "8098:8098"
+
+volumes:
+  redis_data:
