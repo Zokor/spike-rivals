@@ -200,11 +200,10 @@ export class Player extends Phaser.GameObjects.Container {
       this.isGrounded = false;
       this.playAnimation('jump');
 
-      // Squash and stretch effect
+      // Visual feedback - alpha pulse (pixel-safe)
       this.scene.tweens.add({
         targets: this.sprite,
-        scaleX: 0.8,
-        scaleY: 1.2,
+        alpha: 0.85,
         duration: 100,
         yoyo: true,
         ease: 'Quad.easeOut',
@@ -237,7 +236,7 @@ export class Player extends Phaser.GameObjects.Container {
     }
 
     // Perform the hit
-    ball.hitByPlayer(this as any, this.velocityX, this.velocityY, this.controlFactor);
+    ball.hitByPlayer(this, this.velocityX, this.velocityY, this.controlFactor);
     ball.setLastHitBy(this.side);
 
     // Play hit animation
@@ -247,11 +246,10 @@ export class Player extends Phaser.GameObjects.Container {
     this.canHit = false;
     this.hitCooldown = this.hitCooldownDuration;
 
-    // Visual feedback
+    // Visual feedback - alpha pulse (pixel-safe)
     this.scene.tweens.add({
       targets: this.sprite,
-      scaleX: 1.2,
-      scaleY: 0.9,
+      alpha: 0.7,
       duration: 50,
       yoyo: true,
     });
@@ -375,11 +373,10 @@ export class Player extends Phaser.GameObjects.Container {
       if (wasInAir) {
         this.playAnimation('idle');
 
-        // Landing squash effect
+        // Landing feedback - alpha pulse (pixel-safe)
         this.scene.tweens.add({
           targets: this.sprite,
-          scaleX: 1.2,
-          scaleY: 0.8,
+          alpha: 0.85,
           duration: 80,
           yoyo: true,
           ease: 'Quad.easeOut',
@@ -422,11 +419,7 @@ export class Player extends Phaser.GameObjects.Container {
     const heightAboveGround = groundY - this.y;
     const maxHeight = this.jumpForce * 0.5; // Approximate max jump height
 
-    // Scale shadow based on height (smaller when higher)
-    const scale = Math.max(0.3, 1 - (heightAboveGround / maxHeight) * 0.7);
-    this.shadowSprite.setScale(scale, scale * 0.5);
-
-    // Fade shadow based on height
+    // Fade shadow based on height (keep scale integer for pixel art)
     const alpha = Math.max(0.1, 0.3 - (heightAboveGround / maxHeight) * 0.2);
     this.shadowSprite.setAlpha(alpha);
 

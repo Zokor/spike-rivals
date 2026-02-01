@@ -8,7 +8,8 @@
       "Bash(lsof:*)",
       "Bash(xargs kill -9)",
       "Bash(bun update:*)",
-      "Bash(npx skills:*)"
+      "Bash(npx skills:*)",
+      "Bash(bun run typecheck:client:*)"
     ]
   }
 }

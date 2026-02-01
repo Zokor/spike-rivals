@@ -6,14 +6,28 @@ import {
   Character,
   type CharacterId,
   type GameMode,
+  type GameState as ServerGameState,
 } from '@spike-rivals/shared';
+import type { Room } from 'colyseus.js';
 import { GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { BackgroundManager } from '../backgrounds';
 import { HUD } from '../ui/hud';
 import { PauseMenu } from '../ui/pause-menu';
 import { GameOverDialog } from '../ui/game-over-dialog';
+import {
+  colyseusClient,
+  createPredictionManager,
+  createNetworkStateManager,
+  type PredictionManager,
+  type NetworkStateManager,
+} from '../network';
 
-type GameState = 'READY' | 'COUNTDOWN' | 'PLAYING' | 'POINT_SCORED' | 'GAME_OVER' | 'PAUSED';
+type LocalGameState = 'READY' | 'COUNTDOWN' | 'PLAYING' | 'POINT_SCORED' | 'GAME_OVER' | 'PAUSED';
+
+const IS_DEV = import.meta.env.DEV;
+const AUTO_RETRY_BASE_MS = 1500;
+const AUTO_RETRY_MAX_MS = 15000;
+const AUTO_RETRY_MAX_ATTEMPTS = 5;
 
 interface GameSceneData {
   mode: GameMode;
@@ -22,16 +36,23 @@ interface GameSceneData {
 }
 
 interface PlayerObject {
-  sprite: Phaser.Physics.Arcade.Sprite | Phaser.GameObjects.Rectangle;
+  sprite: ArcadeSpriteOrRect;
   body: Phaser.Physics.Arcade.Body;
   side: 'left' | 'right';
   character: Character;
   isJumping: boolean;
 }
 
+type ArcadeBody = Phaser.Physics.Arcade.Body;
+type ArcadeSpriteOrRect = (Phaser.GameObjects.Sprite | Phaser.GameObjects.Rectangle) & { body: ArcadeBody };
+type ArcadeArc = Phaser.GameObjects.Arc & { body: ArcadeBody };
+
+const withArcadeBody = <T extends Phaser.GameObjects.GameObject>(obj: T): T & { body: ArcadeBody } =>
+  obj as T & { body: ArcadeBody };
+
 export class GameScene extends Phaser.Scene {
   // Game state
-  private gameState: GameState = 'READY';
+  private gameState: LocalGameState = 'READY';
   private mode: GameMode = 'cpu';
   private score = { left: 0, right: 0 };
   private servingSide: 'left' | 'right' = 'left';
@@ -40,7 +61,7 @@ export class GameScene extends Phaser.Scene {
   // Entities
   private player1!: PlayerObject;
   private player2!: PlayerObject;
-  private ball!: Phaser.Physics.Arcade.Sprite | Phaser.GameObjects.Arc;
+  private ball!: ArcadeArc;
   private ballBody!: Phaser.Physics.Arcade.Body;
   private net!: Phaser.Physics.Arcade.Sprite;
   private ground!: Phaser.Physics.Arcade.Sprite;
@@ -50,12 +71,28 @@ export class GameScene extends Phaser.Scene {
   private hud!: HUD;
   private pauseMenu!: PauseMenu;
   private gameOverDialog!: GameOverDialog;
+  private predictionManager: PredictionManager | null = null;
+  private predictionInitialized = false;
+  private predictionOpponents = new Set<string>();
+  private onlineRoom: Room<ServerGameState> | null = null;
+  private lastJumpHeld = false;
+  private serverCountdownText: Phaser.GameObjects.Text | null = null;
+  private networkStateManager: NetworkStateManager | null = null;
+  private localSide: 'left' | 'right' | null = null;
+  private serverTick = 0;
+  private connectionErrorDialog: Phaser.GameObjects.Container | null = null;
+  private connectionErrorText: Phaser.GameObjects.Text | null = null;
+  private connectionErrorActive = false;
+  private retryCount = 0;
+  private retryTimer: Phaser.Time.TimerEvent | null = null;
+  private isConnecting = false;
+  private connectionText: Phaser.GameObjects.Text | null = null;
 
   // Input
-  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
-  private wasd!: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key };
-  private spaceKey!: Phaser.Input.Keyboard.Key;
-  private pauseKey!: Phaser.Input.Keyboard.Key;
+  private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
+  private wasd: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key } | null = null;
+  private spaceKey: Phaser.Input.Keyboard.Key | null = null;
+  private pauseKey: Phaser.Input.Keyboard.Key | null = null;
 
   // Touch controls
   private touchControls = { left: false, right: false, jump: false };
@@ -78,12 +115,28 @@ export class GameScene extends Phaser.Scene {
     this.servingSide = 'left';
     this.gameState = 'READY';
     this.winningScore = this.mode === 'ranked' ? GAME.RANKED_POINTS : GAME.CASUAL_POINTS;
+    this.predictionManager = null;
+    this.predictionInitialized = false;
+    this.predictionOpponents.clear();
+    this.onlineRoom = null;
+    this.lastJumpHeld = false;
+    this.networkStateManager = null;
+    this.localSide = null;
+    this.serverTick = 0;
+    this.connectionErrorDialog = null;
+    this.connectionErrorText = null;
+    this.connectionErrorActive = false;
+    this.retryCount = 0;
+    this.retryTimer = null;
+    this.isConnecting = false;
   }
 
   create(): void {
-    // Use ENVELOP mode for gameplay to fill screen (menu uses FIT)
-    this.scale.scaleMode = Phaser.Scale.ENVELOP;
-    this.scale.refresh();
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      if (this.mode !== 'cpu') {
+        colyseusClient.leave();
+      }
+    });
 
     // Setup physics world bounds
     this.physics.world.setBounds(0, 0, GAME_WIDTH, GAME_HEIGHT);
@@ -113,8 +166,14 @@ export class GameScene extends Phaser.Scene {
     // Setup input
     this.setupInput();
 
-    // Start countdown
-    this.startCountdown();
+    // Online prediction seed wiring + connection
+    this.setupOnlinePrediction();
+    if (this.mode === 'cpu') {
+      // Start countdown immediately for offline
+      this.startCountdown();
+    } else {
+      void this.setupOnlineConnection();
+    }
   }
 
   private createGround(): void {
@@ -151,33 +210,40 @@ export class GameScene extends Phaser.Scene {
     // Player 1 (left side)
     const p1TextureKey = `char-${p1Char.id}`;
     let p1Sprite: Phaser.GameObjects.Sprite | Phaser.GameObjects.Rectangle;
+    const p1Y = PHYSICS.GROUND_Y - PHYSICS.PLAYER_HEIGHT / 2; // Center Y position
 
     if (this.textures.exists(p1TextureKey)) {
-      // Use character sprite
-      p1Sprite = this.add.sprite(100, PHYSICS.GROUND_Y, p1TextureKey);
-      p1Sprite.setOrigin(0.5, 1); // Bottom center origin for proper ground alignment
+      // Use character sprite - position at center of collision area
+      p1Sprite = this.add.sprite(100, p1Y, p1TextureKey);
+      // Default origin (0.5, 0.5) centers the sprite
     } else {
       // Fallback to placeholder rectangle
       p1Sprite = this.add.rectangle(
         100,
-        PHYSICS.GROUND_Y - PHYSICS.PLAYER_HEIGHT / 2,
+        p1Y,
         PHYSICS.PLAYER_WIDTH,
         PHYSICS.PLAYER_HEIGHT,
         0x00ff88
       );
     }
     this.physics.add.existing(p1Sprite);
-    const p1Body = p1Sprite.body as Phaser.Physics.Arcade.Body;
+    const p1SpriteWithBody = withArcadeBody(p1Sprite);
+    const p1Body = p1SpriteWithBody.body;
     p1Body.setSize(PHYSICS.PLAYER_WIDTH, PHYSICS.PLAYER_HEIGHT);
-    p1Body.setOffset(
-      p1Sprite instanceof Phaser.GameObjects.Sprite ? -PHYSICS.PLAYER_WIDTH / 2 : 0,
-      p1Sprite instanceof Phaser.GameObjects.Sprite ? -PHYSICS.PLAYER_HEIGHT : 0
-    );
+    // For sprites, offset the body to center it on the sprite
+    if (p1Sprite instanceof Phaser.GameObjects.Sprite) {
+      const frameWidth = p1Sprite.width;
+      const frameHeight = p1Sprite.height;
+      p1Body.setOffset(
+        (frameWidth - PHYSICS.PLAYER_WIDTH) / 2,
+        (frameHeight - PHYSICS.PLAYER_HEIGHT) / 2
+      );
+    }
     p1Body.setCollideWorldBounds(true);
     p1Body.setBounce(0);
 
     this.player1 = {
-      sprite: p1Sprite as unknown as Phaser.Physics.Arcade.Sprite,
+      sprite: p1SpriteWithBody,
       body: p1Body,
       side: 'left',
       character: p1Char,
@@ -187,34 +253,40 @@ export class GameScene extends Phaser.Scene {
     // Player 2 (right side)
     const p2TextureKey = `char-${p2Char.id}`;
     let p2Sprite: Phaser.GameObjects.Sprite | Phaser.GameObjects.Rectangle;
+    const p2Y = PHYSICS.GROUND_Y - PHYSICS.PLAYER_HEIGHT / 2; // Center Y position
 
     if (this.textures.exists(p2TextureKey)) {
-      // Use character sprite
-      p2Sprite = this.add.sprite(GAME_WIDTH - 100, PHYSICS.GROUND_Y, p2TextureKey);
-      p2Sprite.setOrigin(0.5, 1);
+      // Use character sprite - position at center of collision area
+      p2Sprite = this.add.sprite(GAME_WIDTH - 100, p2Y, p2TextureKey);
       p2Sprite.setFlipX(true); // Face left for right-side player
     } else {
       // Fallback to placeholder rectangle
       p2Sprite = this.add.rectangle(
         GAME_WIDTH - 100,
-        PHYSICS.GROUND_Y - PHYSICS.PLAYER_HEIGHT / 2,
+        p2Y,
         PHYSICS.PLAYER_WIDTH,
         PHYSICS.PLAYER_HEIGHT,
         0xff6688
       );
     }
     this.physics.add.existing(p2Sprite);
-    const p2Body = p2Sprite.body as Phaser.Physics.Arcade.Body;
+    const p2SpriteWithBody = withArcadeBody(p2Sprite);
+    const p2Body = p2SpriteWithBody.body;
     p2Body.setSize(PHYSICS.PLAYER_WIDTH, PHYSICS.PLAYER_HEIGHT);
-    p2Body.setOffset(
-      p2Sprite instanceof Phaser.GameObjects.Sprite ? -PHYSICS.PLAYER_WIDTH / 2 : 0,
-      p2Sprite instanceof Phaser.GameObjects.Sprite ? -PHYSICS.PLAYER_HEIGHT : 0
-    );
+    // For sprites, offset the body to center it on the sprite
+    if (p2Sprite instanceof Phaser.GameObjects.Sprite) {
+      const frameWidth = p2Sprite.width;
+      const frameHeight = p2Sprite.height;
+      p2Body.setOffset(
+        (frameWidth - PHYSICS.PLAYER_WIDTH) / 2,
+        (frameHeight - PHYSICS.PLAYER_HEIGHT) / 2
+      );
+    }
     p2Body.setCollideWorldBounds(true);
     p2Body.setBounce(0);
 
     this.player2 = {
-      sprite: p2Sprite as unknown as Phaser.Physics.Arcade.Sprite,
+      sprite: p2SpriteWithBody,
       body: p2Body,
       side: 'right',
       character: p2Char,
@@ -229,8 +301,9 @@ export class GameScene extends Phaser.Scene {
     const ballVisual = this.add.circle(ballX, 80, PHYSICS.BALL_RADIUS, 0xffff00);
     this.physics.add.existing(ballVisual);
 
-    this.ball = ballVisual as unknown as Phaser.Physics.Arcade.Sprite;
-    this.ballBody = ballVisual.body as Phaser.Physics.Arcade.Body;
+    const ballWithBody = withArcadeBody(ballVisual);
+    this.ball = ballWithBody;
+    this.ballBody = ballWithBody.body;
     this.ballBody.setCircle(PHYSICS.BALL_RADIUS);
     this.ballBody.setBounce(PHYSICS.BALL_BOUNCE);
     this.ballBody.setCollideWorldBounds(true);
@@ -288,11 +361,10 @@ export class GameScene extends Phaser.Scene {
       Math.sin(finalAngle) * hitPower
     );
 
-    // Visual feedback
+    // Visual feedback - alpha pulse (pixel-safe)
     this.tweens.add({
       targets: this.ball,
-      scaleX: 1.3,
-      scaleY: 0.7,
+      alpha: 0.7,
       duration: 50,
       yoyo: true,
     });
@@ -333,24 +405,30 @@ export class GameScene extends Phaser.Scene {
   }
 
   private setupInput(): void {
-    this.cursors = this.input.keyboard!.createCursorKeys();
-    this.wasd = {
-      W: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.W),
-      A: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.A),
-      S: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.S),
-      D: this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.D),
-    };
-    this.spaceKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-    this.pauseKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+    const keyboard = this.input.keyboard;
+    if (keyboard) {
+      this.cursors = keyboard.createCursorKeys();
+      this.wasd = {
+        W: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W),
+        A: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A),
+        S: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
+        D: keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D),
+      };
+      this.spaceKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+      this.pauseKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
-    // Pause toggle
-    this.pauseKey.on('down', () => {
-      if (this.gameState === 'PLAYING') {
-        this.pauseGame();
-      } else if (this.gameState === 'PAUSED') {
-        this.resumeGame();
-      }
-    });
+      // Pause toggle
+      this.pauseKey.on('down', () => {
+        if (this.mode !== 'cpu') {
+          return;
+        }
+        if (this.gameState === 'PLAYING') {
+          this.pauseGame();
+        } else if (this.gameState === 'PAUSED') {
+          this.resumeGame();
+        }
+      });
+    }
 
     // Touch controls
     this.setupTouchControls();
@@ -374,6 +452,296 @@ export class GameScene extends Phaser.Scene {
       this.touchControls = { left: false, right: false, jump: false };
     });
   }
+
+  private setupOnlinePrediction(): void {
+    if (this.mode === 'cpu') return;
+    this.predictionManager = createPredictionManager();
+    this.networkStateManager = createNetworkStateManager();
+    colyseusClient.onSeed((seed) => {
+      this.predictionManager?.setSeed(seed);
+      this.showConnectionStatus('SEED SYNCED', '#00ff88', 800);
+    });
+    this.predictionManager.setInputSendCallback((input, tick) => {
+      colyseusClient.sendInput({
+        left: input.left,
+        right: input.right,
+        jump: input.jump,
+        jumpPressed: input.jumpPressed ?? false,
+        sequence: tick,
+      });
+    });
+  }
+
+  private async setupOnlineConnection(): Promise<void> {
+    if (this.isConnecting) return;
+    this.isConnecting = true;
+    this.showConnectionStatus('CONNECTING...', '#00ff88');
+    this.hideConnectionError();
+    this.clearAutoRetry();
+
+    try {
+      let room = null;
+      if (this.mode === 'quick') {
+        room = await colyseusClient.quickMatch();
+      } else if (this.mode === 'ranked') {
+        room = await colyseusClient.rankedMatch();
+      } else if (this.mode === 'private') {
+        room = await colyseusClient.privateRoom();
+      } else {
+        room = await colyseusClient.joinOrCreate('game_room', { mode: this.mode });
+      }
+
+      if (room) {
+        this.onlineRoom = room;
+        this.networkStateManager?.setLocalPlayerId(room.sessionId);
+        room.onStateChange((state) => this.handleServerState(state));
+        room.onLeave(() => {
+          this.showConnectionStatus('DISCONNECTED', '#ff6688');
+          this.showConnectionError('Connection lost');
+          this.scheduleAutoRetry('Reconnecting');
+        });
+        room.onError(() => {
+          this.showConnectionStatus('CONNECTION ERROR', '#ff6688');
+          this.showConnectionError('Connection error');
+          this.scheduleAutoRetry('Reconnecting');
+        });
+        colyseusClient.sendReady();
+        if (IS_DEV) {
+          console.log(`Connected to room ${room.roomId} (${room.name})`);
+        }
+      }
+      this.showConnectionStatus('CONNECTED', '#00ff88', 800);
+      this.hideConnectionError();
+      this.isConnecting = false;
+      this.retryCount = 0;
+      this.physics.pause();
+    } catch (error) {
+      if (IS_DEV) {
+        console.error('Failed to connect to room:', error);
+      }
+      this.showConnectionStatus('CONNECT FAILED', '#ff6688');
+      this.showConnectionError('Unable to connect');
+      this.scheduleAutoRetry('Retrying');
+      this.isConnecting = false;
+    }
+  }
+
+  private showConnectionStatus(message: string, color: string, autoHideMs = 0): void {
+    if (!IS_DEV) return;
+    if (!this.connectionText) {
+      this.connectionText = this.add.text(GAME_WIDTH / 2, 30, message, {
+        fontSize: '8px',
+        fontFamily: 'monospace',
+        color,
+      }).setOrigin(0.5);
+    } else {
+      this.connectionText.setText(message);
+      this.connectionText.setColor(color);
+      this.connectionText.setVisible(true);
+    }
+
+    if (autoHideMs > 0) {
+      this.time.delayedCall(autoHideMs, () => {
+        this.connectionText?.setVisible(false);
+      });
+    }
+  }
+
+  private showConnectionError(message: string): void {
+    this.connectionErrorActive = true;
+
+    if (!this.connectionErrorDialog) {
+      this.connectionErrorDialog = this.add.container(0, 0).setDepth(1000);
+
+      const overlay = this.add.rectangle(
+        GAME_WIDTH / 2,
+        GAME_HEIGHT / 2,
+        GAME_WIDTH,
+        GAME_HEIGHT,
+        0x000000,
+        0.8
+      );
+      this.connectionErrorDialog.add(overlay);
+
+      const title = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 40, 'CONNECTION ISSUE', {
+        fontSize: '16px',
+        fontFamily: 'monospace',
+        color: '#ffffff',
+      }).setOrigin(0.5);
+      this.connectionErrorDialog.add(title);
+
+      this.connectionErrorText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2 - 15, message, {
+        fontSize: '10px',
+        fontFamily: 'monospace',
+        color: '#ff6688',
+      }).setOrigin(0.5);
+      this.connectionErrorDialog.add(this.connectionErrorText);
+
+      const retryBtn = this.createDialogButton(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 15, 'RETRY', () => {
+        this.hideConnectionError();
+        this.retryCount = 0;
+        void this.setupOnlineConnection();
+      });
+      this.connectionErrorDialog.add(retryBtn);
+
+      const quitBtn = this.createDialogButton(GAME_WIDTH / 2, GAME_HEIGHT / 2 + 45, 'QUIT', () => {
+        this.scene.start('MenuScene', { notice: 'Online unavailable — switched to offline.' });
+      });
+      this.connectionErrorDialog.add(quitBtn);
+    } else if (this.connectionErrorText) {
+      this.connectionErrorText.setText(message);
+    }
+
+    this.connectionErrorDialog.setVisible(true);
+  }
+
+  private hideConnectionError(): void {
+    this.connectionErrorActive = false;
+    this.connectionErrorDialog?.setVisible(false);
+  }
+
+  private scheduleAutoRetry(prefix: string): void {
+    if (this.mode === 'cpu') return;
+    if (this.retryCount >= AUTO_RETRY_MAX_ATTEMPTS) return;
+
+    const delay = Math.min(
+      AUTO_RETRY_MAX_MS,
+      AUTO_RETRY_BASE_MS * Math.pow(2, this.retryCount)
+    );
+    const seconds = Math.ceil(delay / 1000);
+    this.retryCount += 1;
+
+    if (this.connectionErrorText) {
+      this.connectionErrorText.setText(`${prefix}. Retrying in ${seconds}s...`);
+    }
+
+    this.clearAutoRetry();
+    this.retryTimer = this.time.delayedCall(delay, () => {
+      void this.setupOnlineConnection();
+    });
+  }
+
+  private clearAutoRetry(): void {
+    if (this.retryTimer) {
+      this.retryTimer.remove(false);
+      this.retryTimer = null;
+    }
+  }
+
+  private createDialogButton(
+    x: number,
+    y: number,
+    text: string,
+    onClick: () => void
+  ): Phaser.GameObjects.Text {
+    const btn = this.add.text(x, y, text, {
+      fontSize: '12px',
+      fontFamily: 'monospace',
+      color: '#ffffff',
+      backgroundColor: '#333366',
+      padding: { x: 16, y: 6 },
+    })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    btn.on('pointerover', () => btn.setStyle({ backgroundColor: '#4444aa' }));
+    btn.on('pointerout', () => btn.setStyle({ backgroundColor: '#333366' }));
+    btn.on('pointerdown', onClick);
+
+    return btn;
+  }
+
+  private handleServerState(state: ServerGameState): void {
+    this.serverTick += 1;
+    this.networkStateManager?.onServerState(state.players, state.ball, Date.now());
+    this.predictionManager?.onServerState({
+      players: state.players,
+      ball: state.ball,
+      tick: this.serverTick,
+    });
+    this.applyServerScore(state);
+    this.applyServerStatus(state);
+    this.initializePredictionFromState(state);
+  }
+
+  private applyServerScore(state: ServerGameState): void {
+    if (!state.score) return;
+    this.hud.updateScore(state.score.player1, state.score.player2);
+  }
+
+  private applyServerStatus(state: ServerGameState): void {
+    if (state.status === 'countdown') {
+      const timer = state.timer ?? 0;
+      this.showServerCountdown(timer);
+    } else {
+      this.hideServerCountdown();
+    }
+
+    if (state.status === 'finished' && state.winnerSide) {
+      this.gameState = 'GAME_OVER';
+      const p1 = state.score?.player1 ?? 0;
+      const p2 = state.score?.player2 ?? 0;
+      this.gameOverDialog.show(state.winnerSide, p1, p2);
+    }
+  }
+
+  private showServerCountdown(timer: number): void {
+    if (!this.serverCountdownText) {
+      this.serverCountdownText = this.add.text(GAME_WIDTH / 2, GAME_HEIGHT / 2, `${timer}`, {
+        fontSize: '48px',
+        fontFamily: 'monospace',
+        color: '#ffffff',
+      }).setOrigin(0.5).setDepth(100);
+    } else {
+      this.serverCountdownText.setText(timer.toString());
+      this.serverCountdownText.setVisible(true);
+    }
+  }
+
+  private hideServerCountdown(): void {
+    this.serverCountdownText?.setVisible(false);
+  }
+
+  private initializePredictionFromState(state: ServerGameState): void {
+    if (!this.predictionManager || !this.onlineRoom) return;
+    const localId = this.onlineRoom.sessionId;
+    const localPlayer = state.players.get(localId);
+    if (!localPlayer) return;
+
+    if (!this.predictionInitialized) {
+      this.localSide = localPlayer.side;
+      this.predictionManager.initialize(
+        localId,
+        localPlayer.characterId as CharacterId,
+        localPlayer.side,
+        {
+          speed: localPlayer.speed ?? 5,
+          jump: localPlayer.jump ?? 5,
+          power: localPlayer.power ?? 5,
+          control: localPlayer.control ?? 5,
+        }
+      );
+      this.predictionInitialized = true;
+    }
+
+    state.players.forEach((player, id) => {
+      if (id === localId) return;
+      if (this.predictionOpponents.has(id)) return;
+      this.predictionOpponents.add(id);
+      this.predictionManager?.addOpponent(
+        id,
+        player.characterId as CharacterId,
+        player.side,
+        {
+          speed: player.speed ?? 5,
+          jump: player.jump ?? 5,
+          power: player.power ?? 5,
+          control: player.control ?? 5,
+        }
+      );
+    });
+  }
+
 
   private startCountdown(): void {
     this.gameState = 'COUNTDOWN';
@@ -435,6 +803,13 @@ export class GameScene extends Phaser.Scene {
     // Update background parallax (optional)
     this.backgroundManager.update(0);
 
+    if (this.mode !== 'cpu') {
+      this.predictionManager?.update(delta);
+      this.handleOnlineInput();
+      this.renderOnlineState();
+      return;
+    }
+
     if (this.gameState === 'PLAYING') {
       // Handle player input
       this.handlePlayer1Input(delta);
@@ -459,6 +834,54 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private handleOnlineInput(): void {
+    if (!this.predictionManager || !this.predictionInitialized || this.connectionErrorActive) return;
+
+    const left = (this.cursors?.left?.isDown ?? false) || (this.wasd?.A.isDown ?? false) || this.touchControls.left;
+    const right = (this.cursors?.right?.isDown ?? false) || (this.wasd?.D.isDown ?? false) || this.touchControls.right;
+    const jumpHeld =
+      (this.cursors?.up?.isDown ?? false) ||
+      (this.wasd?.W.isDown ?? false) ||
+      (this.spaceKey?.isDown ?? false) ||
+      this.touchControls.jump;
+
+    const jumpPressed = jumpHeld && !this.lastJumpHeld;
+    this.lastJumpHeld = jumpHeld;
+
+    this.predictionManager.onLocalInput({
+      left,
+      right,
+      jump: jumpHeld,
+      jumpPressed,
+    });
+  }
+
+  private renderOnlineState(): void {
+    if (!this.predictionManager || !this.networkStateManager || !this.localSide) return;
+
+    const localPos = this.predictionManager.getLocalPlayerPosition();
+    const localTarget = this.localSide === 'left' ? this.player1 : this.player2;
+    const opponentTarget = this.localSide === 'left' ? this.player2 : this.player1;
+
+    if (localPos) {
+      localTarget.sprite.x = localPos.x;
+      localTarget.sprite.y = localPos.y;
+    }
+
+    const now = Date.now();
+    const opponentState = this.networkStateManager.getOpponentState(now);
+    if (opponentState) {
+      opponentTarget.sprite.x = opponentState.x;
+      opponentTarget.sprite.y = opponentState.y;
+    }
+
+    const ballState = this.networkStateManager.getBallState(now);
+    if (ballState) {
+      this.ball.x = ballState.x;
+      this.ball.y = ballState.y;
+    }
+  }
+
   private handlePlayer1Input(delta: number): void {
     const player = this.player1;
     const moveSpeed = player.character.getMovementSpeed();
@@ -466,15 +889,22 @@ export class GameScene extends Phaser.Scene {
 
     // Movement
     let velocityX = 0;
-    if (this.cursors.left.isDown || this.wasd.A.isDown || this.touchControls.left) {
+    const movingLeft = (this.cursors?.left?.isDown ?? false) || (this.wasd?.A.isDown ?? false) || this.touchControls.left;
+    const movingRight = (this.cursors?.right?.isDown ?? false) || (this.wasd?.D.isDown ?? false) || this.touchControls.right;
+
+    if (movingLeft) {
       velocityX = -moveSpeed;
-    } else if (this.cursors.right.isDown || this.wasd.D.isDown || this.touchControls.right) {
+    } else if (movingRight) {
       velocityX = moveSpeed;
     }
     player.body.setVelocityX(velocityX);
 
     // Jump
-    const wantsJump = this.cursors.up.isDown || this.wasd.W.isDown || this.spaceKey.isDown || this.touchControls.jump;
+    const wantsJump =
+      (this.cursors?.up?.isDown ?? false) ||
+      (this.wasd?.W.isDown ?? false) ||
+      (this.spaceKey?.isDown ?? false) ||
+      this.touchControls.jump;
     if (wantsJump && !player.isJumping && player.body.blocked.down) {
       player.body.setVelocityY(-jumpForce);
       player.isJumping = true;
@@ -483,6 +913,34 @@ export class GameScene extends Phaser.Scene {
     // Check if landed
     if (player.body.blocked.down) {
       player.isJumping = false;
+    }
+
+    // Play animations (only for sprites)
+    this.updatePlayerAnimation(player, velocityX !== 0, movingLeft);
+  }
+
+  private updatePlayerAnimation(player: PlayerObject, isMoving: boolean, facingLeft: boolean): void {
+    const sprite = player.sprite;
+    if (!(sprite instanceof Phaser.GameObjects.Sprite)) return;
+
+    const charId = player.character.id;
+    const animKey = player.isJumping
+      ? (player.body.velocity.y < 0 ? `${charId}-jump` : `${charId}-fall`)
+      : isMoving
+        ? `${charId}-run`
+        : `${charId}-idle`;
+
+    // Only change animation if different
+    if (sprite.anims.currentAnim?.key !== animKey) {
+      sprite.play(animKey, true);
+    }
+
+    // Flip sprite based on direction (player 1 faces right by default)
+    if (player.side === 'left') {
+      sprite.setFlipX(facingLeft);
+    } else {
+      // Player 2 faces left by default, so flip logic is inverted
+      sprite.setFlipX(!facingLeft);
     }
   }
 
@@ -535,6 +993,11 @@ export class GameScene extends Phaser.Scene {
     if (cpu.body.blocked.down) {
       cpu.isJumping = false;
     }
+
+    // Play CPU animations
+    const isMoving = Math.abs(cpu.body.velocity.x) > 10;
+    const movingLeft = cpu.body.velocity.x < 0;
+    this.updatePlayerAnimation(cpu, isMoving, movingLeft);
   }
 
   private clampPlayerPositions(): void {

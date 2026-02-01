@@ -24,7 +24,7 @@ const CHARACTER_COLORS: Record<CharacterId, number> = {
 export class CharacterPortrait extends Phaser.GameObjects.Container {
   readonly characterId: CharacterId;
   private background: Phaser.GameObjects.Rectangle;
-  private portrait: Phaser.GameObjects.Rectangle; // Placeholder, replace with Sprite
+  private portrait: Phaser.GameObjects.Rectangle | Phaser.GameObjects.Image;
   private border: Phaser.GameObjects.Rectangle;
   private lockIcon: Phaser.GameObjects.Text;
   private isSelected = false;
@@ -41,9 +41,21 @@ export class CharacterPortrait extends Phaser.GameObjects.Container {
     this.background = scene.add.rectangle(0, 0, config.size, config.size, 0x222233);
     this.add(this.background);
 
-    // Character portrait (placeholder rectangle with character color)
-    const color = this.isLocked ? 0x444444 : CHARACTER_COLORS[config.characterId];
-    this.portrait = scene.add.rectangle(0, 0, config.size - 4, config.size - 4, color);
+    // Character portrait - use actual texture if available, otherwise placeholder
+    const portraitKey = `portrait-${config.characterId}`;
+    if (scene.textures.exists(portraitKey)) {
+      this.portrait = scene.add.image(0, 0, portraitKey);
+      // Scale portrait to fit the size
+      const scale = (config.size - 4) / Math.max(this.portrait.width, this.portrait.height);
+      this.portrait.setScale(scale);
+      if (this.isLocked) {
+        this.portrait.setTint(0x444444);
+      }
+    } else {
+      // Fallback to placeholder rectangle with character color
+      const color = this.isLocked ? 0x444444 : CHARACTER_COLORS[config.characterId];
+      this.portrait = scene.add.rectangle(0, 0, config.size - 4, config.size - 4, color);
+    }
     this.add(this.portrait);
 
     // Selection border (hidden by default)
@@ -74,32 +86,25 @@ export class CharacterPortrait extends Phaser.GameObjects.Container {
   private onHover(): void {
     if (this.isLocked) return;
 
-    this.scene.tweens.add({
-      targets: this,
-      scaleX: 1.1,
-      scaleY: 1.1,
-      duration: 100,
-      ease: 'Power2',
-    });
-
     this.border.setVisible(true);
     this.border.setStrokeStyle(2, 0xaaaaaa);
+
+    this.scene.tweens.add({
+      targets: this.border,
+      alpha: 0.6,
+      duration: 100,
+      yoyo: true,
+      ease: 'Power2',
+    });
   }
 
   private onHoverEnd(): void {
     if (this.isLocked) return;
 
-    this.scene.tweens.add({
-      targets: this,
-      scaleX: 1,
-      scaleY: 1,
-      duration: 100,
-      ease: 'Power2',
-    });
-
     if (!this.isSelected) {
       this.border.setVisible(false);
     }
+    this.border.setAlpha(1);
   }
 
   select(): void {
@@ -109,25 +114,21 @@ export class CharacterPortrait extends Phaser.GameObjects.Container {
     this.border.setVisible(true);
     this.border.setStrokeStyle(3, 0x00ff88);
 
-    // Selection animation
+    // Selection animation - border pulse (pixel-safe)
     this.scene.tweens.add({
-      targets: this,
-      scaleX: 1.15,
-      scaleY: 1.15,
+      targets: this.border,
+      alpha: 0.5,
       duration: 150,
       ease: 'Back.easeOut',
       yoyo: true,
       repeat: 0,
-      onComplete: () => {
-        this.setScale(1.05);
-      },
     });
   }
 
   deselect(): void {
     this.isSelected = false;
     this.border.setVisible(false);
-    this.setScale(1);
+    this.border.setAlpha(1);
   }
 
   getIsSelected(): boolean {
@@ -141,7 +142,11 @@ export class CharacterPortrait extends Phaser.GameObjects.Container {
   unlock(): void {
     this.isLocked = false;
     this.lockIcon.setVisible(false);
-    this.portrait.setFillStyle(CHARACTER_COLORS[this.characterId]);
+    if (this.portrait instanceof Phaser.GameObjects.Rectangle) {
+      this.portrait.setFillStyle(CHARACTER_COLORS[this.characterId]);
+    } else if (this.portrait instanceof Phaser.GameObjects.Image) {
+      this.portrait.clearTint();
+    }
     this.setInteractive({ useHandCursor: true });
   }
 }

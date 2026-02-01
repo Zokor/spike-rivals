@@ -222,11 +222,10 @@ export class Ball extends Phaser.GameObjects.Container {
     this.spin = Phaser.Math.Clamp(newSpin, -3, 3);
     this.hitCooldown = this.hitCooldownDuration;
 
-    // Visual feedback - squash effect
+    // Visual feedback - alpha pulse (pixel-safe)
     this.scene.tweens.add({
       targets: this.sprite,
-      scaleX: 1.4,
-      scaleY: 0.6,
+      alpha: 0.7,
       duration: 50,
       yoyo: true,
       ease: 'Quad.easeOut',

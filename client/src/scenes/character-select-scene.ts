@@ -18,16 +18,18 @@ export class CharacterSelectScene extends Phaser.Scene {
   private characterDescription!: Phaser.GameObjects.Text;
   private playstyleText!: Phaser.GameObjects.Text;
   private selectButton!: Phaser.GameObjects.Text;
-  private previewSprite!: Phaser.GameObjects.Rectangle; // Placeholder for character preview
+  private previewSprite!: Phaser.GameObjects.Rectangle | Phaser.GameObjects.Sprite;
+  private previewX = 0;
+  private previewY = 0;
 
   private selectedIndex = 0;
   private selectedCharacterId: CharacterId = 'nova';
   private mode: SceneData['mode'] = 'cpu';
   private onSelectCallback?: (characterId: CharacterId) => void;
 
-  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
-  private enterKey!: Phaser.Input.Keyboard.Key;
-  private escKey!: Phaser.Input.Keyboard.Key;
+  private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
+  private enterKey: Phaser.Input.Keyboard.Key | null = null;
+  private escKey: Phaser.Input.Keyboard.Key | null = null;
 
   constructor() {
     super({ key: 'CharacterSelectScene' });
@@ -118,17 +120,18 @@ export class CharacterSelectScene extends Phaser.Scene {
   }
 
   private createPreviewArea(): void {
-    const previewX = GAME_WIDTH / 2 + 40;
-    const previewY = 100;
+    this.previewX = GAME_WIDTH / 2 + 40;
+    this.previewY = 100;
 
     // Preview box background
-    this.add.rectangle(previewX, previewY, 80, 100, 0x222233);
+    this.add.rectangle(this.previewX, this.previewY, 80, 100, 0x222233);
 
-    // Character preview (placeholder)
-    this.previewSprite = this.add.rectangle(previewX, previewY, 48, 64, 0x00ff88);
+    // Character preview - will be created/updated in updatePreview
+    // Start with a placeholder rectangle
+    this.previewSprite = this.add.rectangle(this.previewX, this.previewY, 48, 64, 0x00ff88);
 
     // Character name
-    this.characterName = this.add.text(previewX, previewY + 60, 'Nova', {
+    this.characterName = this.add.text(this.previewX, this.previewY + 60, 'Nova', {
       fontSize: '12px',
       fontFamily: 'monospace',
       color: '#ffffff',
@@ -176,19 +179,22 @@ export class CharacterSelectScene extends Phaser.Scene {
   }
 
   private setupInput(): void {
-    this.cursors = this.input.keyboard!.createCursorKeys();
-    this.enterKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
-    this.escKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+    const keyboard = this.input.keyboard;
+    if (!keyboard) return;
+
+    this.cursors = keyboard.createCursorKeys();
+    this.enterKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+    this.escKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
 
     // Keyboard navigation
-    this.input.keyboard!.on('keydown-LEFT', () => this.navigate(-1, 0));
-    this.input.keyboard!.on('keydown-RIGHT', () => this.navigate(1, 0));
-    this.input.keyboard!.on('keydown-UP', () => this.navigate(0, -1));
-    this.input.keyboard!.on('keydown-DOWN', () => this.navigate(0, 1));
+    keyboard.on('keydown-LEFT', () => this.navigate(-1, 0));
+    keyboard.on('keydown-RIGHT', () => this.navigate(1, 0));
+    keyboard.on('keydown-UP', () => this.navigate(0, -1));
+    keyboard.on('keydown-DOWN', () => this.navigate(0, 1));
 
-    this.input.keyboard!.on('keydown-ENTER', () => this.confirmSelection());
-    this.input.keyboard!.on('keydown-SPACE', () => this.confirmSelection());
-    this.input.keyboard!.on('keydown-ESC', () => this.goBack());
+    keyboard.on('keydown-ENTER', () => this.confirmSelection());
+    keyboard.on('keydown-SPACE', () => this.confirmSelection());
+    keyboard.on('keydown-ESC', () => this.goBack());
   }
 
   private navigate(dx: number, dy: number): void {
@@ -245,24 +251,38 @@ export class CharacterSelectScene extends Phaser.Scene {
       control: character.control,
     });
 
-    // Update preview color (placeholder)
-    const colors: Record<CharacterId, number> = {
-      blitz: 0x00ff88,
-      crusher: 0xff4444,
-      sky: 0x44aaff,
-      zen: 0xffcc00,
-      tank: 0x888888,
-      flash: 0xffff00,
-      nova: 0xff88ff,
-      ghost: 0x8844ff,
-    };
-    this.previewSprite.setFillStyle(colors[charId]);
+    // Update preview sprite
+    const textureKey = `char-${charId}`;
+
+    // Destroy old preview sprite
+    if (this.previewSprite) {
+      this.previewSprite.destroy();
+    }
+
+    if (this.textures.exists(textureKey)) {
+      // Use actual character sprite
+      this.previewSprite = this.add.sprite(this.previewX, this.previewY, textureKey, 0);
+      // Scale to fit preview area (sprite is 24x32, we want ~48x64)
+      this.previewSprite.setScale(2);
+    } else {
+      // Fallback to placeholder rectangle with character color
+      const colors: Record<CharacterId, number> = {
+        blitz: 0x00ff88,
+        crusher: 0xff4444,
+        sky: 0x44aaff,
+        zen: 0xffcc00,
+        tank: 0x888888,
+        flash: 0xffff00,
+        nova: 0xff88ff,
+        ghost: 0x8844ff,
+      };
+      this.previewSprite = this.add.rectangle(this.previewX, this.previewY, 48, 64, colors[charId]);
+    }
 
     // Animate preview
     this.tweens.add({
       targets: this.previewSprite,
-      scaleX: 1.1,
-      scaleY: 1.1,
+      alpha: 0.7,
       duration: 100,
       yoyo: true,
       ease: 'Power2',
@@ -276,8 +296,7 @@ export class CharacterSelectScene extends Phaser.Scene {
     // Play selection animation
     this.tweens.add({
       targets: this.selectButton,
-      scaleX: 0.9,
-      scaleY: 0.9,
+      alpha: 0.7,
       duration: 50,
       yoyo: true,
       onComplete: () => {

@@ -124,6 +124,58 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
+    // Create character animations for loaded spritesheets
+    this.createCharacterAnimations();
+
     this.scene.start('MenuScene');
+  }
+
+  private createCharacterAnimations(): void {
+    // Animation frame layout (10 cols x 4 rows = 40 frames per character):
+    // Row 0 (0-9): Idle animation
+    // Row 1 (10-19): Run animation
+    // Row 2 (20-29): Jump animation
+    // Row 3 (30-39): Hit/Special animation
+
+    const characters = ['blitz', 'crusher', 'sky', 'zen', 'tank', 'flash', 'nova', 'ghost'];
+
+    for (const charId of characters) {
+      const key = `char-${charId}`;
+
+      // Skip if texture not loaded
+      if (!this.textures.exists(key)) continue;
+
+      // Idle animation (first row, frames 0-3)
+      this.anims.create({
+        key: `${charId}-idle`,
+        frames: this.anims.generateFrameNumbers(key, { start: 0, end: 3 }),
+        frameRate: 6,
+        repeat: -1,
+      });
+
+      // Run animation (second row, frames 10-17)
+      this.anims.create({
+        key: `${charId}-run`,
+        frames: this.anims.generateFrameNumbers(key, { start: 10, end: 17 }),
+        frameRate: 10,
+        repeat: -1,
+      });
+
+      // Jump animation (third row, frames 20-23)
+      this.anims.create({
+        key: `${charId}-jump`,
+        frames: this.anims.generateFrameNumbers(key, { start: 20, end: 23 }),
+        frameRate: 8,
+        repeat: 0,
+      });
+
+      // Fall animation (third row, frames 24-27)
+      this.anims.create({
+        key: `${charId}-fall`,
+        frames: this.anims.generateFrameNumbers(key, { start: 24, end: 27 }),
+        frameRate: 8,
+        repeat: 0,
+      });
+    }
   }
 }

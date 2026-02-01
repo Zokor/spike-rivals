@@ -78,6 +78,7 @@ export class GameState extends Schema {
 
   @type('string') status: GameStatus = 'waiting';
   @type('string') mode: GameMode = 'casual';
+  @type('number') seed: number = 0;
   @type('number') timer: number = 0; // Countdown timer or match timer
   @type('number') matchTime: number = 0; // Total match time in seconds
   @type('string') servingSide: 'left' | 'right' = 'left';

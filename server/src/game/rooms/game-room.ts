@@ -8,7 +8,7 @@ import {
   type GameStatus,
   type GameMode,
 } from '../schema/game-state';
-import { PHYSICS, GAME, CHARACTERS, ATTRIBUTE_FORMULAS } from '@spike-rivals/shared';
+import { PHYSICS, GAME, CHARACTERS, ATTRIBUTE_FORMULAS, SeededRandom } from '@spike-rivals/shared';
 
 // Room configuration
 const TICK_RATE = 60; // Server simulation rate (Hz)
@@ -30,6 +30,8 @@ export class GameRoom extends Room<GameState> {
   private lastTickTime: number = 0;
   private tickAccumulator: number = 0;
   private readonly fixedDeltaTime = 1000 / TICK_RATE;
+  private random!: SeededRandom;
+  private randomSeed: number = 0;
 
   // ==================== Lifecycle ====================
 
@@ -37,6 +39,9 @@ export class GameRoom extends Room<GameState> {
     this.setState(new GameState());
     this.state.mode = options.mode || 'casual';
     this.state.roomId = this.roomId;
+    this.randomSeed = Date.now();
+    this.random = new SeededRandom(this.randomSeed);
+    this.state.seed = this.randomSeed;
 
     // Set max score based on mode
     const maxScore = this.state.mode === 'ranked' ? GAME.RANKED_POINTS : GAME.CASUAL_POINTS;
@@ -78,6 +83,9 @@ export class GameRoom extends Room<GameState> {
         players: this.getPlayersSummary(),
       });
     }
+
+    // Send deterministic seed to client for prediction
+    client.send('seed', { seed: this.state.seed });
   }
 
   async onLeave(client: Client, consented: boolean): Promise<void> {
@@ -599,7 +607,7 @@ export class GameRoom extends Room<GameState> {
 
     // Add randomness based on control
     const randomFactor = 1 - controlFactor;
-    const randomAngle = (Math.random() - 0.5) * randomFactor * Math.PI * 0.5;
+    const randomAngle = this.random.nextCentered() * randomFactor * Math.PI * 0.5;
     const cos = Math.cos(randomAngle);
     const sin = Math.sin(randomAngle);
     const finalDirX = dirX * cos - dirY * sin;

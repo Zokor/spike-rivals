@@ -4,9 +4,14 @@ import { GAME_WIDTH, GAME_HEIGHT } from '../config';
 export class MenuScene extends Phaser.Scene {
   private selectedIndex = 0;
   private menuButtons: Phaser.GameObjects.Text[] = [];
+  private notice: string | null = null;
 
   constructor() {
     super({ key: 'MenuScene' });
+  }
+
+  init(data: { notice?: string } | undefined): void {
+    this.notice = data?.notice ?? null;
   }
 
   create(): void {
@@ -75,10 +80,13 @@ export class MenuScene extends Phaser.Scene {
     this.data.set('menuItems', menuItems);
 
     // Setup keyboard navigation
-    this.input.keyboard!.on('keydown-UP', () => this.navigateMenu(-1));
-    this.input.keyboard!.on('keydown-DOWN', () => this.navigateMenu(1));
-    this.input.keyboard!.on('keydown-ENTER', () => this.activateMenuItem(this.selectedIndex));
-    this.input.keyboard!.on('keydown-SPACE', () => this.activateMenuItem(this.selectedIndex));
+    const keyboard = this.input.keyboard;
+    if (keyboard) {
+      keyboard.on('keydown-UP', () => this.navigateMenu(-1));
+      keyboard.on('keydown-DOWN', () => this.navigateMenu(1));
+      keyboard.on('keydown-ENTER', () => this.activateMenuItem(this.selectedIndex));
+      keyboard.on('keydown-SPACE', () => this.activateMenuItem(this.selectedIndex));
+    }
 
     // Select first item
     this.selectMenuItem(0);
@@ -96,6 +104,16 @@ export class MenuScene extends Phaser.Scene {
       fontFamily: 'monospace',
       color: '#444444',
     }).setOrigin(0, 1);
+
+    if (this.notice) {
+      const noticeText = this.add.text(width / 2, height - 18, this.notice, {
+        fontSize: '8px',
+        fontFamily: 'monospace',
+        color: '#ffcc00',
+      }).setOrigin(0.5, 1);
+      this.time.delayedCall(3000, () => noticeText.setVisible(false));
+      this.notice = null;
+    }
   }
 
   private navigateMenu(direction: number): void {
@@ -122,8 +140,7 @@ export class MenuScene extends Phaser.Scene {
     // Button press animation
     this.tweens.add({
       targets: this.menuButtons[index],
-      scaleX: 0.95,
-      scaleY: 0.95,
+      alpha: 0.7,
       duration: 50,
       yoyo: true,
       onComplete: () => {

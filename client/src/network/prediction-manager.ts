@@ -53,6 +53,7 @@ const DEFAULT_CONFIG: PredictionConfig = {
 
 export class PredictionManager {
   private config: PredictionConfig;
+  private seed: number | null = null;
 
   // Local player ID
   private localPlayerId: string | null = null;
@@ -139,7 +140,9 @@ export class PredictionManager {
    */
   onLocalInput(input: PlayerInput): void {
     if (!this.localPlayerId) {
-      console.warn('PredictionManager: Cannot process input - not initialized');
+      if (import.meta.env.DEV) {
+        console.warn('PredictionManager: Cannot process input - not initialized');
+      }
       return;
     }
 
@@ -174,8 +177,10 @@ export class PredictionManager {
 
     // Convert PlayerInput to PlayerInputState
     const inputState: PlayerInputState = {
-      moveX: input.left ? -1 : input.right ? 1 : 0,
+      left: input.left,
+      right: input.right,
       jump: input.jump,
+      jumpPressed: input.jumpPressed ?? false,
     };
 
     // Create input map with just local player
@@ -268,8 +273,10 @@ export class PredictionManager {
     for (let i = 0; i < ticksToSimulate; i++) {
       const snapshot = inputsToReapply[i];
       const inputState: PlayerInputState = {
-        moveX: snapshot.input.left ? -1 : snapshot.input.right ? 1 : 0,
+        left: snapshot.input.left,
+        right: snapshot.input.right,
         jump: snapshot.input.jump,
+        jumpPressed: snapshot.input.jumpPressed ?? false,
       };
 
       const inputs = new Map<string, PlayerInputState>();
@@ -431,8 +438,17 @@ export class PredictionManager {
     this.lastConfirmedState = null;
     this.predictedState = null;
     this.correctionOffset = { x: 0, y: 0 };
-    this.simulation = new PhysicsSimulation();
+    this.simulation = new PhysicsSimulation(this.seed ?? Date.now());
     this.log('Reset');
+  }
+
+  /**
+   * Set deterministic seed for prediction (must match server)
+   */
+  setSeed(seed: number): void {
+    this.seed = seed;
+    this.simulation.setSeed(seed);
+    this.log(`Seed set to ${seed}`);
   }
 
   /**

@@ -58,8 +58,7 @@ export class HUD extends Phaser.GameObjects.Container {
   animateScore(side: 'left' | 'right'): void {
     this.scene.tweens.add({
       targets: this.scoreText,
-      scaleX: 1.3,
-      scaleY: 1.3,
+      alpha: 0.6,
       duration: 100,
       yoyo: true,
       ease: 'Bounce.easeOut',

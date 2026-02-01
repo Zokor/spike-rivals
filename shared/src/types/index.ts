@@ -29,7 +29,16 @@ export interface PlayerState {
   characterId: CharacterId;
   side: 'left' | 'right';
   isJumping: boolean;
+  isGrounded?: boolean;
   score: number;
+  animation?: string;
+  connected?: boolean;
+  username?: string;
+  odUserId?: string;
+  speed?: number;
+  jump?: number;
+  power?: number;
+  control?: number;
 }
 
 export interface BallState {
@@ -38,21 +47,34 @@ export interface BallState {
   velocityX: number;
   velocityY: number;
   lastHitBy: string | null;
+  spin?: number;
 }
+
+export type GameStatus = 'waiting' | 'countdown' | 'playing' | 'point_scored' | 'paused' | 'finished';
 
 export interface GameState {
   players: Map<string, PlayerState>;
   ball: BallState;
-  phase: 'waiting' | 'countdown' | 'playing' | 'scored' | 'ended';
+  score?: { player1: number; player2: number };
+  status?: GameStatus;
+  timer?: number;
+  matchTime?: number;
   servingSide: 'left' | 'right';
   winner: string | null;
+  winnerSide?: 'left' | 'right' | null;
+  roomId?: string;
+  createdAt?: number;
+  startedAt?: number;
+  seed?: number;
 }
 
 export interface PlayerInput {
   left: boolean;
   right: boolean;
   jump: boolean;
-  timestamp: number;
+  jumpPressed?: boolean;
+  timestamp?: number;
+  sequence?: number;
 }
 
 export interface MatchResult {

@@ -61,6 +61,6 @@ export class ShopScene extends Phaser.Scene {
     backButton.on('pointerout', () => backButton.setStyle({ backgroundColor: '#333366' }));
     backButton.on('pointerdown', () => this.scene.start('MenuScene'));
 
-    this.input.keyboard!.on('keydown-ESC', () => this.scene.start('MenuScene'));
+    this.input.keyboard?.on('keydown-ESC', () => this.scene.start('MenuScene'));
   }
 }

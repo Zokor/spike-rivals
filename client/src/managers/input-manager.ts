@@ -171,7 +171,8 @@ export class InputManager {
   // ==================== Keyboard ====================
 
   private setupKeyboard(): void {
-    if (!this.scene.input.keyboard) return;
+    const keyboard = this.scene.input.keyboard;
+    if (!keyboard) return;
 
     // Register all bound keys
     const allKeyCodes = new Set<number>();
@@ -181,7 +182,7 @@ export class InputManager {
     });
 
     allKeyCodes.forEach(code => {
-      const key = this.scene.input.keyboard!.addKey(code);
+      const key = keyboard.addKey(code);
       this.keys.set(code, key);
     });
   }
