@@ -61,6 +61,8 @@ export interface PlayerInputState {
   right: boolean;
   jump: boolean;
   jumpPressed: boolean; // True only on the frame jump was pressed
+  action?: boolean; // Action button held (bump/spike)
+  actionPressed?: boolean; // True only on the frame action was pressed
 }
 
 /**

@@ -9,7 +9,10 @@
       "Bash(xargs kill -9)",
       "Bash(bun update:*)",
       "Bash(npx skills:*)",
-      "Bash(bun run typecheck:client:*)"
+      "Bash(bun run typecheck:client:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npx tsc:*)",
+      "Bash(ln:*)"
     ]
   }
 }

@@ -17,11 +17,11 @@ export interface BallSkin {
   price: { coins?: number; gems?: number };
 }
 
+const STORAGE_KEY = 'spike-rivals-skins';
+
 export class SkinManager {
-  private ownedSkins: Set<string> = new Set();
-  private ownedBallSkins: Set<string> = new Set();
-  private equippedSkins: Map<CharacterId, string> = new Map();
-  private equippedBallSkin: string = 'default';
+  private ownedItems: Set<string> = new Set();
+  private equippedItems: Map<string, string> = new Map(); // category -> itemId
 
   constructor() {
     this.loadFromStorage();
@@ -29,13 +29,11 @@ export class SkinManager {
 
   private loadFromStorage(): void {
     try {
-      const saved = localStorage.getItem('spike-rivals-skins');
+      const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const data = JSON.parse(saved);
-        this.ownedSkins = new Set(data.ownedSkins || []);
-        this.ownedBallSkins = new Set(data.ownedBallSkins || []);
-        this.equippedSkins = new Map(Object.entries(data.equippedSkins || {}));
-        this.equippedBallSkin = data.equippedBallSkin || 'default';
+        this.ownedItems = new Set(data.ownedItems || []);
+        this.equippedItems = new Map(Object.entries(data.equippedItems || {}));
       }
     } catch {
       // Start fresh if storage is corrupted
@@ -45,54 +43,130 @@ export class SkinManager {
   private saveToStorage(): void {
     try {
       const data = {
-        ownedSkins: Array.from(this.ownedSkins),
-        ownedBallSkins: Array.from(this.ownedBallSkins),
-        equippedSkins: Object.fromEntries(this.equippedSkins),
-        equippedBallSkin: this.equippedBallSkin,
+        ownedItems: Array.from(this.ownedItems),
+        equippedItems: Object.fromEntries(this.equippedItems),
       };
-      localStorage.setItem('spike-rivals-skins', JSON.stringify(data));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } catch {
       // Storage might be full or disabled
     }
   }
 
-  ownsSkin(skinId: string): boolean {
-    return this.ownedSkins.has(skinId) || skinId === 'default';
+  /**
+   * Check if player owns an item (generic)
+   */
+  isOwned(itemId: string): boolean {
+    return this.ownedItems.has(itemId) || itemId === 'default';
   }
 
-  unlockSkin(skinId: string): void {
-    this.ownedSkins.add(skinId);
+  /**
+   * Add item to owned collection
+   */
+  addOwned(itemId: string): void {
+    this.ownedItems.add(itemId);
     this.saveToStorage();
   }
 
+  /**
+   * Check if an item is currently equipped
+   */
+  isEquipped(itemId: string): boolean {
+    for (const equipped of this.equippedItems.values()) {
+      if (equipped === itemId) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Equip an item (auto-detects category from item ID prefix)
+   */
+  equip(itemId: string): boolean {
+    if (!this.isOwned(itemId)) return false;
+
+    // Determine category from item ID
+    const category = this.getCategoryFromItemId(itemId);
+    this.equippedItems.set(category, itemId);
+    this.saveToStorage();
+    return true;
+  }
+
+  /**
+   * Get equipped item for a category
+   */
+  getEquipped(category: string): string | undefined {
+    return this.equippedItems.get(category);
+  }
+
+  /**
+   * Infer category from item ID prefix
+   */
+  private getCategoryFromItemId(itemId: string): string {
+    if (itemId.startsWith('ball-')) return 'ball';
+    if (itemId.startsWith('net-')) return 'net';
+    if (itemId.startsWith('fx-')) return 'fx';
+    if (itemId.startsWith('ui-')) return 'ui';
+    // Character skins: extract character ID
+    const parts = itemId.split('-');
+    if (parts.length >= 2) return `skin-${parts[0]}`;
+    return 'unknown';
+  }
+
+  // ==================== Legacy API (for backwards compatibility) ====================
+
+  ownsSkin(skinId: string): boolean {
+    return this.isOwned(skinId);
+  }
+
+  unlockSkin(skinId: string): void {
+    this.addOwned(skinId);
+  }
+
   equipSkin(characterId: CharacterId, skinId: string): boolean {
-    if (!this.ownsSkin(skinId)) return false;
-    this.equippedSkins.set(characterId, skinId);
+    if (!this.isOwned(skinId)) return false;
+    this.equippedItems.set(`skin-${characterId}`, skinId);
     this.saveToStorage();
     return true;
   }
 
   getEquippedSkin(characterId: CharacterId): string {
-    return this.equippedSkins.get(characterId) || 'default';
+    return this.equippedItems.get(`skin-${characterId}`) || 'default';
   }
 
   ownsBallSkin(skinId: string): boolean {
-    return this.ownedBallSkins.has(skinId) || skinId === 'default';
+    return this.isOwned(skinId);
   }
 
   unlockBallSkin(skinId: string): void {
-    this.ownedBallSkins.add(skinId);
-    this.saveToStorage();
+    this.addOwned(skinId);
   }
 
   equipBallSkin(skinId: string): boolean {
-    if (!this.ownsBallSkin(skinId)) return false;
-    this.equippedBallSkin = skinId;
+    if (!this.isOwned(skinId)) return false;
+    this.equippedItems.set('ball', skinId);
     this.saveToStorage();
     return true;
   }
 
   getEquippedBallSkin(): string {
-    return this.equippedBallSkin;
+    return this.equippedItems.get('ball') || 'default';
   }
+
+  /**
+   * Reset all owned/equipped items (for testing)
+   */
+  reset(): void {
+    this.ownedItems.clear();
+    this.equippedItems.clear();
+    this.saveToStorage();
+  }
+}
+
+// Singleton instance
+let instance: SkinManager | null = null;
+
+export function getSkinManager(): SkinManager {
+  if (!instance) {
+    instance = new SkinManager();
+  }
+  return instance;
 }

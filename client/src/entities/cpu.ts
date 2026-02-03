@@ -1,8 +1,33 @@
 import { PHYSICS } from '@spike-rivals/shared';
-import type { Player, InputState } from './player';
-import type { Ball } from './ball';
+import type { InputState } from './player';
 
 export type CpuDifficulty = 'easy' | 'medium' | 'hard' | 'impossible';
+
+type CpuAction = 'bump' | 'spike';
+
+// Action timing windows (must match game-scene.ts ACTION_TIMING)
+const ACTION_TIMING = {
+  bump: { total: 180, activeStart: 60, activeEnd: 90 },
+  spike: { total: 200, activeStart: 80, activeEnd: 110 },
+};
+
+export interface CpuPlayerLike {
+  readonly x: number;
+  readonly y: number;
+  getIsGrounded(): boolean;
+  moveLeft: (speedMultiplier?: number) => void;
+  moveRight: (speedMultiplier?: number) => void;
+  stop: () => void;
+  jump: () => void;
+  triggerAction?: (action: CpuAction) => void;
+}
+
+export interface CpuBallLike {
+  readonly x: number;
+  readonly y: number;
+  getVelocity: () => { x: number; y: number };
+  predictLanding: () => { x: number; time: number } | null;
+}
 
 interface DifficultyConfig {
   reactionDelay: number; // ms before reacting to ball changes
@@ -72,8 +97,8 @@ interface PredictedLanding {
 }
 
 export class CpuController {
-  private player: Player;
-  private ball: Ball;
+  private player: CpuPlayerLike;
+  private ball: CpuBallLike;
   private config: DifficultyConfig;
   private difficulty: CpuDifficulty;
 
@@ -95,6 +120,7 @@ export class CpuController {
   private readonly courtMiddle = PHYSICS.COURT_WIDTH / 2;
   private readonly mySideStart: number;
   private readonly mySideEnd: number;
+  private readonly hitRange = 35; // Slightly larger than player hit range
 
   // Input state (mimics player input)
   private currentInput: InputState = {
@@ -103,9 +129,10 @@ export class CpuController {
     jump: false,
     jumpPressed: false,
     action: false,
+    actionPressed: false,
   };
 
-  constructor(player: Player, ball: Ball, difficulty: CpuDifficulty = 'medium') {
+  constructor(player: CpuPlayerLike, ball: CpuBallLike, difficulty: CpuDifficulty = 'medium') {
     this.player = player;
     this.ball = ball;
     this.difficulty = difficulty;
@@ -130,6 +157,10 @@ export class CpuController {
    */
   getDifficulty(): CpuDifficulty {
     return this.difficulty;
+  }
+
+  getHitPowerMultiplier(): number {
+    return this.config.hitPowerMultiplier;
   }
 
   /**
@@ -184,7 +215,8 @@ export class CpuController {
 
     // Determine AI state based on ball position and trajectory
     if (ballOnMySide) {
-      if (this.isBallInHitRange()) {
+      // Enter hitting state if ball is in range OR will be in range when action becomes active
+      if (this.isBallInHitRange() || this.willBallBeInHitRange(this.getActionActiveStartMs())) {
         this.aiState = 'hitting';
       } else if (this.shouldPrepareJump()) {
         this.aiState = 'jumping';
@@ -213,6 +245,7 @@ export class CpuController {
       jump: false,
       jumpPressed: false,
       action: false,
+      actionPressed: false,
     };
 
     switch (this.aiState) {
@@ -311,6 +344,12 @@ export class CpuController {
     if (this.ball.y < PHYSICS.GROUND_Y - 50 && this.player.getIsGrounded()) {
       this.currentInput.jumpPressed = true;
     }
+
+    // Trigger action early - anticipate the windup delay
+    // Use predictive check: will ball be in range when the active window opens?
+    if (!this.shouldMiss && this.willBallBeInHitRange(this.getActionActiveStartMs())) {
+      this.currentInput.actionPressed = true;
+    }
   }
 
   /**
@@ -333,11 +372,11 @@ export class CpuController {
    * Apply input to the player
    */
   private applyInput(): void {
-    // Convert moveX multiplier to actual movement
+    const speedMultiplier = Math.min(1, Math.abs(this.currentInput.moveX));
     if (this.currentInput.moveX < -0.1) {
-      this.player.moveLeft();
+      this.player.moveLeft(speedMultiplier);
     } else if (this.currentInput.moveX > 0.1) {
-      this.player.moveRight();
+      this.player.moveRight(speedMultiplier);
     } else {
       this.player.stop();
     }
@@ -346,6 +385,15 @@ export class CpuController {
     if (this.currentInput.jumpPressed) {
       this.player.jump();
     }
+
+    if (this.currentInput.actionPressed) {
+      const action: CpuAction = this.player.getIsGrounded() ? 'bump' : 'spike';
+      this.player.triggerAction?.(action);
+    }
+  }
+
+  private getActionActiveStartMs(): number {
+    return this.player.getIsGrounded() ? ACTION_TIMING.bump.activeStart : ACTION_TIMING.spike.activeStart;
   }
 
   /**
@@ -377,13 +425,85 @@ export class CpuController {
   }
 
   /**
-   * Check if ball is within hitting range
+   * Check if ball is within hitting range (current position)
    */
   private isBallInHitRange(): boolean {
+    return this.getBallDistanceToPlayer() < this.hitRange;
+  }
+
+  /**
+   * Get distance from ball to player
+   */
+  private getBallDistanceToPlayer(): number {
     const dx = this.ball.x - this.player.x;
     const dy = this.ball.y - this.player.y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  /**
+   * Predict ball position after a given delay (ms)
+   */
+  private predictBallPositionAfterDelay(delayMs: number): { x: number; y: number } {
+    const delaySec = Math.max(0, delayMs) / 1000;
+    const step = 1 / 60;
+    let time = 0;
+
+    let x = this.ball.x;
+    let y = this.ball.y;
+    let vx = this.ball.getVelocity().x;
+    let vy = this.ball.getVelocity().y;
+
+    const radius = PHYSICS.BALL_RADIUS;
+    const gravity = PHYSICS.GRAVITY;
+    const groundY = PHYSICS.GROUND_Y - radius;
+
+    while (time < delaySec) {
+      const dt = Math.min(step, delaySec - time);
+      vy += gravity * dt;
+      x += vx * dt;
+      y += vy * dt;
+      time += dt;
+
+      // Wall bounces
+      if (x <= radius) {
+        x = radius;
+        vx = Math.abs(vx) * PHYSICS.BALL_BOUNCE;
+      } else if (x >= PHYSICS.COURT_WIDTH - radius) {
+        x = PHYSICS.COURT_WIDTH - radius;
+        vx = -Math.abs(vx) * PHYSICS.BALL_BOUNCE;
+      }
+
+      // Net collision (simplified)
+      const netLeft = PHYSICS.COURT_WIDTH / 2 - PHYSICS.NET_COLLISION_WIDTH / 2;
+      const netRight = PHYSICS.COURT_WIDTH / 2 + PHYSICS.NET_COLLISION_WIDTH / 2;
+      const netTop = PHYSICS.GROUND_Y - PHYSICS.NET_HEIGHT;
+      if (x + radius > netLeft && x - radius < netRight && y + radius > netTop) {
+        vx = -vx * PHYSICS.BALL_BOUNCE;
+        x = vx > 0 ? netRight + radius : netLeft - radius;
+      }
+
+      // Ground hit (stop prediction; scoring happens on contact)
+      if (y >= groundY) {
+        y = groundY;
+        break;
+      }
+    }
+
+    return { x, y };
+  }
+
+  /**
+   * Check if ball will be in hitting range after the action windup completes
+   */
+  private willBallBeInHitRange(delayMs: number): boolean {
+    const predictedBall = this.predictBallPositionAfterDelay(delayMs);
+
+    // Check distance using predicted position
+    const dx = predictedBall.x - this.player.x;
+    const dy = predictedBall.y - this.player.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
-    return distance < 35; // Slightly larger than player's hit range
+
+    return distance < this.hitRange;
   }
 
   /**
@@ -509,6 +629,7 @@ export class CpuController {
       jump: false,
       jumpPressed: false,
       action: false,
+      actionPressed: false,
     };
   }
 

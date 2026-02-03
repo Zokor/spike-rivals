@@ -3,8 +3,22 @@ import { Character, CHARACTER_INFO, type CharacterId } from '@spike-rivals/share
 import { GAME_WIDTH, GAME_HEIGHT } from '../config';
 import { CharacterPortrait } from '../ui/character-portrait';
 import { AttributePanel } from '../ui/attribute-bar';
+import type { CpuDifficulty } from '../entities/cpu';
 
 const ALL_CHARACTER_IDS: CharacterId[] = ['blitz', 'crusher', 'sky', 'zen', 'tank', 'flash', 'nova', 'ghost'];
+const DIFFICULTY_OPTIONS: CpuDifficulty[] = ['easy', 'medium', 'hard', 'impossible'];
+const DIFFICULTY_LABELS: Record<CpuDifficulty, string> = {
+  easy: 'EASY',
+  medium: 'MEDIUM',
+  hard: 'HARD',
+  impossible: 'IMPOSSIBLE',
+};
+const DIFFICULTY_COLORS: Record<CpuDifficulty, number> = {
+  easy: 0x00aa66,
+  medium: 0xaaaa00,
+  hard: 0xcc6600,
+  impossible: 0xcc0000,
+};
 
 interface SceneData {
   mode: 'cpu' | 'quick' | 'ranked' | 'private';
@@ -27,6 +41,11 @@ export class CharacterSelectScene extends Phaser.Scene {
   private mode: SceneData['mode'] = 'cpu';
   private onSelectCallback?: (characterId: CharacterId) => void;
 
+  // Difficulty selection (CPU mode only)
+  private selectedDifficulty: CpuDifficulty = 'medium';
+  private difficultyButtons: Phaser.GameObjects.Text[] = [];
+  private difficultyLabel!: Phaser.GameObjects.Text;
+
   private cursors: Phaser.Types.Input.Keyboard.CursorKeys | null = null;
   private enterKey: Phaser.Input.Keyboard.Key | null = null;
   private escKey: Phaser.Input.Keyboard.Key | null = null;
@@ -44,6 +63,12 @@ export class CharacterSelectScene extends Phaser.Scene {
     if (saved && ALL_CHARACTER_IDS.includes(saved as CharacterId)) {
       this.selectedCharacterId = saved as CharacterId;
       this.selectedIndex = ALL_CHARACTER_IDS.indexOf(this.selectedCharacterId);
+    }
+
+    // Load saved difficulty from localStorage
+    const savedDifficulty = localStorage.getItem('spike-rivals-difficulty');
+    if (savedDifficulty && DIFFICULTY_OPTIONS.includes(savedDifficulty as CpuDifficulty)) {
+      this.selectedDifficulty = savedDifficulty as CpuDifficulty;
     }
   }
 
@@ -69,6 +94,11 @@ export class CharacterSelectScene extends Phaser.Scene {
 
     // Create select button
     this.createSelectButton();
+
+    // Create difficulty selector (CPU mode only)
+    if (this.mode === 'cpu') {
+      this.createDifficultySelector();
+    }
 
     // Setup input
     this.setupInput();
@@ -176,6 +206,76 @@ export class CharacterSelectScene extends Phaser.Scene {
     this.selectButton.on('pointerdown', () => {
       this.confirmSelection();
     });
+  }
+
+  private createDifficultySelector(): void {
+    // Label
+    this.difficultyLabel = this.add.text(GAME_WIDTH / 2, 215, 'DIFFICULTY:', {
+      fontSize: '8px',
+      fontFamily: 'monospace',
+      color: '#888888',
+    }).setOrigin(0.5);
+
+    // Difficulty buttons
+    const buttonWidth = 55;
+    const spacing = 4;
+    const totalWidth = DIFFICULTY_OPTIONS.length * buttonWidth + (DIFFICULTY_OPTIONS.length - 1) * spacing;
+    const startX = (GAME_WIDTH - totalWidth) / 2 + buttonWidth / 2;
+
+    this.difficultyButtons = DIFFICULTY_OPTIONS.map((difficulty, index) => {
+      const x = startX + index * (buttonWidth + spacing);
+      const isSelected = difficulty === this.selectedDifficulty;
+
+      const btn = this.add.text(x, 230, DIFFICULTY_LABELS[difficulty], {
+        fontSize: '8px',
+        fontFamily: 'monospace',
+        color: '#ffffff',
+        backgroundColor: isSelected ? `#${DIFFICULTY_COLORS[difficulty].toString(16).padStart(6, '0')}` : '#333366',
+        padding: { x: 6, y: 4 },
+      })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+
+      btn.on('pointerover', () => {
+        if (difficulty !== this.selectedDifficulty) {
+          btn.setStyle({ backgroundColor: '#444477' });
+        }
+      });
+
+      btn.on('pointerout', () => {
+        if (difficulty !== this.selectedDifficulty) {
+          btn.setStyle({ backgroundColor: '#333366' });
+        }
+      });
+
+      btn.on('pointerdown', () => {
+        this.selectDifficulty(difficulty);
+      });
+
+      return btn;
+    });
+  }
+
+  private selectDifficulty(difficulty: CpuDifficulty): void {
+    this.selectedDifficulty = difficulty;
+
+    // Update button styles
+    DIFFICULTY_OPTIONS.forEach((diff, index) => {
+      const btn = this.difficultyButtons[index];
+      const isSelected = diff === difficulty;
+      btn.setStyle({
+        backgroundColor: isSelected
+          ? `#${DIFFICULTY_COLORS[diff].toString(16).padStart(6, '0')}`
+          : '#333366',
+      });
+    });
+
+    // Save to localStorage
+    try {
+      localStorage.setItem('spike-rivals-difficulty', difficulty);
+    } catch {
+      // Storage may be unavailable; continue without persistence
+    }
   }
 
   private setupInput(): void {
@@ -309,6 +409,7 @@ export class CharacterSelectScene extends Phaser.Scene {
         this.scene.start('GameScene', {
           mode: this.mode,
           characterId: this.selectedCharacterId,
+          difficulty: this.mode === 'cpu' ? this.selectedDifficulty : undefined,
         });
       },
     });

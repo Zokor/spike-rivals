@@ -23,15 +23,23 @@ export class MenuScene extends Phaser.Scene {
     const width = GAME_WIDTH;
     const height = GAME_HEIGHT;
 
-    // Title
-    this.add.text(width / 2, 50, 'SPIKE RIVALS', {
-      fontSize: '28px',
-      fontFamily: 'monospace',
-      color: '#00ff88',
-    }).setOrigin(0.5);
+    // Logo - use image if available, fallback to text
+    if (this.textures.exists('logo')) {
+      const logo = this.add.image(width / 2, 45, 'logo').setOrigin(0.5);
+      // Scale to fit (target ~200px wide)
+      const targetWidth = 200;
+      logo.setScale(targetWidth / logo.width);
+    } else {
+      // Fallback to text title
+      this.add.text(width / 2, 50, 'SPIKE RIVALS', {
+        fontSize: '28px',
+        fontFamily: 'monospace',
+        color: '#00ff88',
+      }).setOrigin(0.5);
+    }
 
     // Subtitle
-    this.add.text(width / 2, 75, 'Competitive Volleyball', {
+    this.add.text(width / 2, 80, 'Competitive Volleyball', {
       fontSize: '10px',
       fontFamily: 'monospace',
       color: '#666666',

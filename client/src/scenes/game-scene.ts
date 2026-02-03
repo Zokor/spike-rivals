@@ -21,6 +21,8 @@ import {
   type PredictionManager,
   type NetworkStateManager,
 } from '../network';
+import { getSkinManager } from '../managers/skin-manager';
+import { CpuController, type CpuDifficulty } from '../entities/cpu';
 
 type LocalGameState = 'READY' | 'COUNTDOWN' | 'PLAYING' | 'POINT_SCORED' | 'GAME_OVER' | 'PAUSED';
 
@@ -33,7 +35,10 @@ interface GameSceneData {
   mode: GameMode;
   characterId?: CharacterId;
   backgroundId?: string;
+  difficulty?: CpuDifficulty;
 }
+
+type ActionState = 'none' | 'bump' | 'spike';
 
 interface PlayerObject {
   sprite: ArcadeSpriteOrRect;
@@ -41,11 +46,21 @@ interface PlayerObject {
   side: 'left' | 'right';
   character: Character;
   isJumping: boolean;
+  // Action-based hitting state
+  actionState: ActionState;
+  actionTimerMs: number;
+  justHitBall: boolean;
 }
+
+// Action timing windows (ms)
+const ACTION_TIMING = {
+  bump: { total: 180, activeStart: 60, activeEnd: 90 },
+  spike: { total: 200, activeStart: 80, activeEnd: 110 },
+};
 
 type ArcadeBody = Phaser.Physics.Arcade.Body;
 type ArcadeSpriteOrRect = (Phaser.GameObjects.Sprite | Phaser.GameObjects.Rectangle) & { body: ArcadeBody };
-type ArcadeArc = Phaser.GameObjects.Arc & { body: ArcadeBody };
+type ArcadeBall = (Phaser.Physics.Arcade.Sprite | Phaser.GameObjects.Arc) & { body: ArcadeBody };
 
 const withArcadeBody = <T extends Phaser.GameObjects.GameObject>(obj: T): T & { body: ArcadeBody } =>
   obj as T & { body: ArcadeBody };
@@ -61,10 +76,11 @@ export class GameScene extends Phaser.Scene {
   // Entities
   private player1!: PlayerObject;
   private player2!: PlayerObject;
-  private ball!: ArcadeArc;
+  private ball!: ArcadeBall;
   private ballBody!: Phaser.Physics.Arcade.Body;
   private net!: Phaser.Physics.Arcade.Sprite;
   private ground!: Phaser.Physics.Arcade.Sprite;
+  private ballTextureKey: string | null = null;
 
   // Managers
   private backgroundManager!: BackgroundManager;
@@ -93,16 +109,30 @@ export class GameScene extends Phaser.Scene {
   private wasd: { W: Phaser.Input.Keyboard.Key; A: Phaser.Input.Keyboard.Key; S: Phaser.Input.Keyboard.Key; D: Phaser.Input.Keyboard.Key } | null = null;
   private spaceKey: Phaser.Input.Keyboard.Key | null = null;
   private pauseKey: Phaser.Input.Keyboard.Key | null = null;
+  private actionKey: Phaser.Input.Keyboard.Key | null = null;
+  private lastActionHeld = false;
 
   // Touch controls
-  private touchControls = { left: false, right: false, jump: false };
+  private touchControls = { left: false, right: false, jump: false, action: false };
 
   // Timing
   private countdownTimer = 3;
   private pointScoredTimer = 0;
 
+  // Hit cooldown (prevents jitter from overlap firing every frame)
+  private lastHitTime: { left: number; right: number } = { left: 0, right: 0 };
+  private readonly HIT_COOLDOWN_MS = 120;
+
+  // Fixed-timestep accumulator for online input (decouples from render FPS)
+  private onlineAccMs = 0;
+  private readonly ONLINE_FIXED_MS = 1000 / 60; // ~16.667ms per tick
+
   // Character data
   private selectedCharacterId: CharacterId = 'nova';
+
+  // CPU Controller (for CPU mode)
+  private cpuController: CpuController | null = null;
+  private selectedDifficulty: CpuDifficulty = 'medium';
 
   constructor() {
     super({ key: 'GameScene' });
@@ -111,6 +141,7 @@ export class GameScene extends Phaser.Scene {
   init(data: GameSceneData): void {
     this.mode = data.mode || 'cpu';
     this.selectedCharacterId = data.characterId || 'nova';
+    this.selectedDifficulty = data.difficulty || 'medium';
     this.score = { left: 0, right: 0 };
     this.servingSide = 'left';
     this.gameState = 'READY';
@@ -129,6 +160,7 @@ export class GameScene extends Phaser.Scene {
     this.retryCount = 0;
     this.retryTimer = null;
     this.isConnecting = false;
+    this.cpuController = null;
   }
 
   create(): void {
@@ -160,6 +192,11 @@ export class GameScene extends Phaser.Scene {
     // Setup collisions
     this.setupCollisions();
 
+    // Setup CPU controller (for CPU mode)
+    if (this.mode === 'cpu') {
+      this.setupCpuController();
+    }
+
     // Create UI
     this.createUI();
 
@@ -183,7 +220,7 @@ export class GameScene extends Phaser.Scene {
     // Physics ground (static)
     this.ground = this.physics.add.sprite(GAME_WIDTH / 2, PHYSICS.GROUND_Y + 5, '__DEFAULT');
     this.ground.setVisible(false);
-    this.ground.body.setSize(GAME_WIDTH, 10);
+    (this.ground.body as Phaser.Physics.Arcade.Body).setSize(GAME_WIDTH, 10, true);
     this.ground.setImmovable(true);
     (this.ground.body as Phaser.Physics.Arcade.Body).allowGravity = false;
   }
@@ -198,7 +235,7 @@ export class GameScene extends Phaser.Scene {
     // Physics net (collision body slightly wider than visual for fair gameplay)
     this.net = this.physics.add.sprite(netX, netY, '__DEFAULT');
     this.net.setVisible(false);
-    this.net.body.setSize(PHYSICS.NET_COLLISION_WIDTH, PHYSICS.NET_HEIGHT);
+    (this.net.body as Phaser.Physics.Arcade.Body).setSize(PHYSICS.NET_COLLISION_WIDTH, PHYSICS.NET_HEIGHT, true);
     this.net.setImmovable(true);
     (this.net.body as Phaser.Physics.Arcade.Body).allowGravity = false;
   }
@@ -248,6 +285,9 @@ export class GameScene extends Phaser.Scene {
       side: 'left',
       character: p1Char,
       isJumping: false,
+      actionState: 'none',
+      actionTimerMs: 0,
+      justHitBall: false,
     };
 
     // Player 2 (right side)
@@ -291,23 +331,65 @@ export class GameScene extends Phaser.Scene {
       side: 'right',
       character: p2Char,
       isJumping: false,
+      actionState: 'none',
+      actionTimerMs: 0,
+      justHitBall: false,
     };
   }
 
   private createBall(): void {
     const ballX = this.servingSide === 'left' ? GAME_WIDTH / 4 : (GAME_WIDTH * 3) / 4;
 
-    // Visual ball
-    const ballVisual = this.add.circle(ballX, 80, PHYSICS.BALL_RADIUS, 0xffff00);
-    this.physics.add.existing(ballVisual);
+    const ballTextureKey = this.resolveBallTextureKey();
+    const diameter = PHYSICS.BALL_RADIUS * 2;
 
-    const ballWithBody = withArcadeBody(ballVisual);
-    this.ball = ballWithBody;
-    this.ballBody = ballWithBody.body;
-    this.ballBody.setCircle(PHYSICS.BALL_RADIUS);
+    let ballVisual: ArcadeBall;
+    if (ballTextureKey) {
+      const ballSprite = this.physics.add.sprite(ballX, 80, ballTextureKey, 0);
+      ballSprite.setDisplaySize(diameter, diameter);
+      this.playBallAnimation(ballSprite, ballTextureKey);
+      ballVisual = ballSprite as ArcadeBall;
+    } else {
+      // Fallback to a simple circle if no ball texture is loaded
+      const ballCircle = this.add.circle(ballX, 80, PHYSICS.BALL_RADIUS, 0xffff00);
+      this.physics.add.existing(ballCircle);
+      ballVisual = withArcadeBody(ballCircle);
+    }
+
+    this.ball = ballVisual;
+    this.ballBody = ballVisual.body;
+    const offsetX = (this.ball.displayWidth - diameter) / 2;
+    const offsetY = (this.ball.displayHeight - diameter) / 2;
+    this.ballBody.setCircle(PHYSICS.BALL_RADIUS, offsetX, offsetY);
     this.ballBody.setBounce(PHYSICS.BALL_BOUNCE);
     this.ballBody.setCollideWorldBounds(true);
     this.ballBody.setMaxVelocity(PHYSICS.MAX_BALL_SPEED, PHYSICS.MAX_BALL_SPEED);
+  }
+
+  private resolveBallTextureKey(): string | null {
+    const skinManager = getSkinManager();
+    const equipped = skinManager.getEquippedBallSkin();
+    const desiredKey = equipped === 'default' ? 'ball-default' : equipped;
+
+    if (this.textures.exists(desiredKey)) {
+      this.ballTextureKey = desiredKey;
+      return desiredKey;
+    }
+
+    if (this.textures.exists('ball-default')) {
+      this.ballTextureKey = 'ball-default';
+      return 'ball-default';
+    }
+
+    this.ballTextureKey = null;
+    return null;
+  }
+
+  private playBallAnimation(ballSprite: Phaser.GameObjects.Sprite, textureKey: string): void {
+    const animKey = `${textureKey}-spin`;
+    if (this.anims.exists(animKey)) {
+      ballSprite.anims.play(animKey);
+    }
   }
 
   private setupCollisions(): void {
@@ -338,28 +420,64 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.player2.sprite, this.ground, () => {
       this.player2.isJumping = false;
     });
+
+    // Ball vs ground (scoring)
+    this.physics.add.collider(this.ball, this.ground, () => {
+      if (this.gameState !== 'PLAYING') return;
+
+      const courtMiddle = GAME_WIDTH / 2;
+      const scorer: 'left' | 'right' = this.ball.x < courtMiddle ? 'right' : 'left';
+
+      // Snap ball to ground top so it never visually clips
+      this.ball.y = PHYSICS.GROUND_Y - PHYSICS.BALL_RADIUS;
+
+      this.scorePoint(scorer);
+    });
   }
 
   private handlePlayerBallCollision(player: PlayerObject): void {
     if (this.gameState !== 'PLAYING') return;
 
-    const hitPower = player.character.getHitPower();
+    // Cooldown check to prevent jitter from overlap firing every frame
+    const now = this.time.now;
+    if (now - this.lastHitTime[player.side] < this.HIT_COOLDOWN_MS) return;
+
+    // In CPU mode, both players must use action-based hitting windows
+    if (this.mode === 'cpu') {
+      if (!this.isPlayerInActiveWindow(player)) return;
+      if (player.justHitBall) return;
+      player.justHitBall = true;
+    }
+
+    this.lastHitTime[player.side] = now;
+
+    const cpuHitMultiplier =
+      this.mode === 'cpu' && player.side === 'right'
+        ? (this.cpuController?.getHitPowerMultiplier() ?? 1)
+        : 1;
+    const hitPower = player.character.getHitPower() * cpuHitMultiplier;
     const controlFactor = player.character.getControlFactor();
 
-    // Calculate hit direction based on relative positions
-    const dx = this.ball.x - player.sprite.x;
-    const dy = this.ball.y - player.sprite.y;
-    const angle = Math.atan2(dy, dx);
+    // Volleyball-like hit: biased upward toward opponent's side
+    // Left player hits up-right (toward 300° = -60°), right player hits up-left (toward 240° = -120°)
+    // For spike (in air), hit harder and more downward
+    const isSpike = player.actionState === 'spike';
+    const baseAngle = Phaser.Math.DegToRad(player.side === 'left' ? (isSpike ? -45 : -60) : (isSpike ? -135 : -120));
+    const powerMultiplier = isSpike ? 1.3 : 1.0; // Spikes are more powerful
 
     // Add randomness based on control (less control = more random)
-    const randomAngle = (Math.random() - 0.5) * (1 - controlFactor) * 0.8;
-    const finalAngle = angle + randomAngle;
+    const randomAngle = (Math.random() - 0.5) * (1 - controlFactor) * 0.6;
+    const finalAngle = baseAngle + randomAngle;
 
     // Apply velocity
     this.ballBody.setVelocity(
-      Math.cos(finalAngle) * hitPower,
-      Math.sin(finalAngle) * hitPower
+      Math.cos(finalAngle) * hitPower * powerMultiplier,
+      Math.sin(finalAngle) * hitPower * powerMultiplier
     );
+
+    // Nudge ball out of overlap to prevent re-hitting
+    const push = PHYSICS.BALL_RADIUS + PHYSICS.PLAYER_WIDTH / 2 + 2;
+    this.ball.x = player.sprite.x + (player.side === 'left' ? push : -push);
 
     // Visual feedback - alpha pulse (pixel-safe)
     this.tweens.add({
@@ -397,7 +515,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     // Controls hint (with safe margin for ENVELOP scaling)
-    this.add.text(UI_SAFE.LEFT, GAME_HEIGHT - UI_SAFE.BOTTOM, 'Arrow/WASD: Move | Space/Up: Jump | ESC: Pause', {
+    this.add.text(UI_SAFE.LEFT, GAME_HEIGHT - UI_SAFE.BOTTOM, 'Arrow/WASD: Move | Space/Up: Jump | X: Hit | ESC: Pause', {
       fontSize: '7px',
       fontFamily: 'monospace',
       color: '#444444',
@@ -416,6 +534,7 @@ export class GameScene extends Phaser.Scene {
       };
       this.spaceKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
       this.pauseKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+      this.actionKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X); // Action button (bump/spike)
 
       // Pause toggle
       this.pauseKey.on('down', () => {
@@ -449,7 +568,7 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.input.on('pointerup', () => {
-      this.touchControls = { left: false, right: false, jump: false };
+      this.touchControls = { left: false, right: false, jump: false, action: false };
     });
   }
 
@@ -804,8 +923,14 @@ export class GameScene extends Phaser.Scene {
     this.backgroundManager.update(0);
 
     if (this.mode !== 'cpu') {
+      // Fixed-timestep input loop (decouples input ticks from render FPS)
+      this.onlineAccMs += delta;
+      while (this.onlineAccMs >= this.ONLINE_FIXED_MS) {
+        this.handleOnlineInputTick();
+        this.onlineAccMs -= this.ONLINE_FIXED_MS;
+      }
+
       this.predictionManager?.update(delta);
-      this.handleOnlineInput();
       this.renderOnlineState();
       return;
     }
@@ -819,8 +944,7 @@ export class GameScene extends Phaser.Scene {
         this.handleCPU(delta);
       }
 
-      // Check for scoring
-      this.checkScoring();
+      // Scoring is now handled by ball-ground collider in setupCollisions()
 
       // Clamp players to their sides
       this.clampPlayerPositions();
@@ -834,7 +958,7 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private handleOnlineInput(): void {
+  private handleOnlineInputTick(): void {
     if (!this.predictionManager || !this.predictionInitialized || this.connectionErrorActive) return;
 
     const left = (this.cursors?.left?.isDown ?? false) || (this.wasd?.A.isDown ?? false) || this.touchControls.left;
@@ -887,6 +1011,9 @@ export class GameScene extends Phaser.Scene {
     const moveSpeed = player.character.getMovementSpeed();
     const jumpForce = player.character.getJumpForce();
 
+    // Update action timer
+    this.updatePlayerActionState(player, delta);
+
     // Movement
     let velocityX = 0;
     const movingLeft = (this.cursors?.left?.isDown ?? false) || (this.wasd?.A.isDown ?? false) || this.touchControls.left;
@@ -915,8 +1042,47 @@ export class GameScene extends Phaser.Scene {
       player.isJumping = false;
     }
 
+    // Action button (bump/spike)
+    const actionHeld = (this.actionKey?.isDown ?? false) || this.touchControls.action;
+    const actionPressed = actionHeld && !this.lastActionHeld;
+    this.lastActionHeld = actionHeld;
+
+    if (actionPressed && player.actionState === 'none') {
+      // Trigger bump (grounded) or spike (in air)
+      player.actionState = player.body.blocked.down ? 'bump' : 'spike';
+      player.actionTimerMs = 0;
+      player.justHitBall = false;
+    }
+
     // Play animations (only for sprites)
     this.updatePlayerAnimation(player, velocityX !== 0, movingLeft);
+  }
+
+  /**
+   * Update player action state timer
+   */
+  private updatePlayerActionState(player: PlayerObject, delta: number): void {
+    if (player.actionState === 'none') return;
+
+    player.actionTimerMs += delta;
+    const timing = ACTION_TIMING[player.actionState];
+
+    if (player.actionTimerMs >= timing.total) {
+      // Action complete, reset
+      player.actionState = 'none';
+      player.actionTimerMs = 0;
+      player.justHitBall = false;
+    }
+  }
+
+  /**
+   * Check if player is in active hit window
+   */
+  private isPlayerInActiveWindow(player: PlayerObject): boolean {
+    if (player.actionState === 'none') return false;
+
+    const timing = ACTION_TIMING[player.actionState];
+    return player.actionTimerMs >= timing.activeStart && player.actionTimerMs <= timing.activeEnd;
   }
 
   private updatePlayerAnimation(player: PlayerObject, isMoving: boolean, facingLeft: boolean): void {
@@ -944,52 +1110,124 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /**
+   * Setup CpuController with adapter objects that bridge GameScene's Phaser objects
+   * to the interface expected by CpuController
+   */
+  private setupCpuController(): void {
+    const self = this;
+    const cpu = this.player2;
+
+    // Create a player adapter that wraps player2 and provides the interface CpuController expects
+    const playerAdapter = {
+      get x() {
+        return cpu.sprite.x;
+      },
+      get y() {
+        return cpu.sprite.y;
+      },
+      getIsGrounded: () => cpu.body.blocked.down,
+      moveLeft: (multiplier = 1) => {
+        const moveSpeed = cpu.character.getMovementSpeed();
+        cpu.body.setVelocityX(-moveSpeed * multiplier);
+      },
+      moveRight: (multiplier = 1) => {
+        const moveSpeed = cpu.character.getMovementSpeed();
+        cpu.body.setVelocityX(moveSpeed * multiplier);
+      },
+      stop: () => {
+        cpu.body.setVelocityX(0);
+      },
+      jump: () => {
+        if (cpu.body.blocked.down && !cpu.isJumping) {
+          const jumpForce = cpu.character.getJumpForce();
+          cpu.body.setVelocityY(-jumpForce);
+          cpu.isJumping = true;
+        }
+      },
+      triggerAction: (action: 'bump' | 'spike') => {
+        if (cpu.actionState !== 'none') return;
+        cpu.actionState = action;
+        cpu.actionTimerMs = 0;
+        cpu.justHitBall = false;
+      },
+    };
+
+    // Create a ball adapter that wraps this.ball and provides the interface CpuController expects
+    const ballAdapter = {
+      get x() {
+        return self.ball.x;
+      },
+      get y() {
+        return self.ball.y;
+      },
+      getVelocity: () => ({
+        x: self.ballBody.velocity.x,
+        y: self.ballBody.velocity.y,
+      }),
+      predictLanding: (): { x: number; time: number } | null => {
+        // Simple physics-based prediction
+        let x = self.ball.x;
+        let y = self.ball.y;
+        let vx = self.ballBody.velocity.x;
+        let vy = self.ballBody.velocity.y;
+        const gravity = PHYSICS.GRAVITY;
+        const groundY = PHYSICS.GROUND_Y - PHYSICS.BALL_RADIUS;
+        const dt = 1 / 60;
+        let time = 0;
+        const maxTime = 5; // Max 5 seconds prediction
+
+        while (time < maxTime) {
+          vy += gravity * dt;
+          x += vx * dt;
+          y += vy * dt;
+          time += dt;
+
+          // Wall bounces
+          if (x < PHYSICS.BALL_RADIUS) {
+            x = PHYSICS.BALL_RADIUS;
+            vx = -vx * PHYSICS.BALL_BOUNCE;
+          } else if (x > GAME_WIDTH - PHYSICS.BALL_RADIUS) {
+            x = GAME_WIDTH - PHYSICS.BALL_RADIUS;
+            vx = -vx * PHYSICS.BALL_BOUNCE;
+          }
+
+          // Net collision (simplified)
+          const radius = PHYSICS.BALL_RADIUS;
+          const netLeft = GAME_WIDTH / 2 - PHYSICS.NET_COLLISION_WIDTH / 2;
+          const netRight = GAME_WIDTH / 2 + PHYSICS.NET_COLLISION_WIDTH / 2;
+          const netTop = PHYSICS.GROUND_Y - PHYSICS.NET_HEIGHT;
+          if (x + radius > netLeft && x - radius < netRight && y + radius > netTop) {
+            vx = -vx * PHYSICS.BALL_BOUNCE;
+            x = vx > 0 ? netRight + radius : netLeft - radius;
+          }
+
+          // Ground hit
+          if (y >= groundY) {
+            return { x, time };
+          }
+        }
+
+        return null;
+      },
+    };
+
+    // Create CpuController with adapters
+    this.cpuController = new CpuController(playerAdapter, ballAdapter, this.selectedDifficulty);
+  }
+
   private handleCPU(delta: number): void {
     const cpu = this.player2;
-    const moveSpeed = cpu.character.getMovementSpeed() * 0.8; // Slightly slower than max
-    const jumpForce = cpu.character.getJumpForce();
-    const courtMiddle = GAME_WIDTH / 2;
 
-    // Only react if ball is on CPU's side or coming towards it
-    const ballOnMySide = this.ball.x > courtMiddle;
-    const ballComingToMe = this.ballBody.velocity.x > 0;
-
-    if (ballOnMySide || ballComingToMe) {
-      // Move towards ball
-      const targetX = this.ball.x;
-      const dx = targetX - cpu.sprite.x;
-
-      if (Math.abs(dx) > 15) {
-        cpu.body.setVelocityX(dx > 0 ? moveSpeed : -moveSpeed);
-      } else {
-        cpu.body.setVelocityX(0);
-      }
-
-      // Jump if ball is above and close
-      const shouldJump =
-        ballOnMySide &&
-        this.ball.y < PHYSICS.GROUND_Y - 60 &&
-        Math.abs(this.ball.x - cpu.sprite.x) < 50 &&
-        !cpu.isJumping &&
-        cpu.body.blocked.down;
-
-      if (shouldJump) {
-        cpu.body.setVelocityY(-jumpForce);
-        cpu.isJumping = true;
-      }
-    } else {
-      // Return to center of my side
-      const homeX = courtMiddle + (GAME_WIDTH - courtMiddle) / 2;
-      const dx = homeX - cpu.sprite.x;
-
-      if (Math.abs(dx) > 20) {
-        cpu.body.setVelocityX(dx > 0 ? moveSpeed * 0.5 : -moveSpeed * 0.5);
-      } else {
-        cpu.body.setVelocityX(0);
-      }
+    // Use CpuController if available (sophisticated AI with difficulty levels)
+    if (this.cpuController) {
+      this.cpuController.update(delta);
     }
 
-    // Check if landed
+    // Update CPU action timing
+    this.updatePlayerActionState(cpu, delta);
+
+    // Check if landed (always needed for isJumping state)
     if (cpu.body.blocked.down) {
       cpu.isJumping = false;
     }
@@ -1019,21 +1257,6 @@ export class GameScene extends Phaser.Scene {
     }
     if (this.player2.sprite.x > GAME_WIDTH - playerHalfWidth) {
       this.player2.sprite.x = GAME_WIDTH - playerHalfWidth;
-    }
-  }
-
-  private checkScoring(): void {
-    // Ball touched ground
-    if (this.ball.y >= PHYSICS.GROUND_Y - PHYSICS.BALL_RADIUS) {
-      const courtMiddle = GAME_WIDTH / 2;
-
-      if (this.ball.x < courtMiddle) {
-        // Ball on left side = right player scores
-        this.scorePoint('right');
-      } else {
-        // Ball on right side = left player scores
-        this.scorePoint('left');
-      }
     }
   }
 
@@ -1096,6 +1319,9 @@ export class GameScene extends Phaser.Scene {
     this.player2.sprite.y = PHYSICS.GROUND_Y - PHYSICS.PLAYER_HEIGHT / 2;
     this.player2.body.setVelocity(0, 0);
 
+    // Reset CPU controller state
+    this.cpuController?.reset();
+
     // Start new countdown
     this.startCountdown();
   }
@@ -1126,7 +1352,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private restartGame(): void {
-    this.scene.restart({ mode: this.mode, characterId: this.selectedCharacterId });
+    this.scene.restart({
+      mode: this.mode,
+      characterId: this.selectedCharacterId,
+      difficulty: this.selectedDifficulty,
+    });
   }
 
   private quitToMenu(): void {

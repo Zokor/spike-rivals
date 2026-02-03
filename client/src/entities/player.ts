@@ -10,10 +10,12 @@ export interface InputState {
   moveY: number; // -1 (up) to 1 (down) - for menus, not used in gameplay
   jump: boolean; // Jump button held
   jumpPressed: boolean; // Jump button just pressed this frame
-  action: boolean; // Action button (not used yet)
+  action: boolean; // Action button held
+  actionPressed: boolean; // Action button just pressed this frame
 }
 
-type AnimationState = 'idle' | 'run' | 'jump' | 'fall' | 'hit' | 'victory' | 'defeat';
+type AnimationState = 'idle' | 'run' | 'jump' | 'fall' | 'hit' | 'bump' | 'spike' | 'victory' | 'defeat';
+type ActionState = 'none' | 'bump' | 'spike';
 
 export class Player extends Phaser.GameObjects.Container {
   // Visual
@@ -35,6 +37,14 @@ export class Player extends Phaser.GameObjects.Container {
   private readonly hitCooldownDuration = 200; // ms
   private readonly hitRange = 28; // pixels - distance to auto-hit ball
 
+  // Action-based hitting (Street Fighter timing)
+  private actionState: ActionState = 'none';
+  private actionTimerMs = 0;
+  private justHitBall = false;
+  // Timing windows (ms): [total duration, active start, active end]
+  private readonly BUMP_TIMING = { total: 180, activeStart: 60, activeEnd: 90 };
+  private readonly SPIKE_TIMING = { total: 200, activeStart: 80, activeEnd: 110 };
+
   // Animation state
   private currentAnimation: AnimationState = 'idle';
   private facingRight: boolean;
@@ -46,6 +56,7 @@ export class Player extends Phaser.GameObjects.Container {
     jump: false,
     jumpPressed: false,
     action: false,
+    actionPressed: false,
   };
 
   constructor(
@@ -157,6 +168,11 @@ export class Player extends Phaser.GameObjects.Container {
     if (input.jumpPressed) {
       this.jump();
     }
+
+    // Action (bump/spike) - only on press
+    if (input.actionPressed) {
+      this.triggerAction();
+    }
   }
 
   /**
@@ -209,6 +225,63 @@ export class Player extends Phaser.GameObjects.Container {
         ease: 'Quad.easeOut',
       });
     }
+  }
+
+  // ==================== Action-Based Hitting ====================
+
+  /**
+   * Trigger an action (bump if grounded, spike if in air)
+   */
+  triggerAction(): void {
+    if (this.actionState !== 'none') return; // Already in action
+
+    // Choose action based on whether grounded
+    this.actionState = this.isGrounded ? 'bump' : 'spike';
+    this.actionTimerMs = 0;
+    this.justHitBall = false;
+
+    // Play corresponding animation
+    this.playAnimation(this.actionState);
+  }
+
+  /**
+   * Check if currently in the active hit window
+   */
+  isInActiveWindow(): boolean {
+    if (this.actionState === 'none') return false;
+
+    const timing = this.actionState === 'bump' ? this.BUMP_TIMING : this.SPIKE_TIMING;
+    return this.actionTimerMs >= timing.activeStart && this.actionTimerMs <= timing.activeEnd;
+  }
+
+  /**
+   * Get current action state
+   */
+  getActionState(): ActionState {
+    return this.actionState;
+  }
+
+  /**
+   * Check if ball was already hit during this action
+   */
+  hasHitBallThisAction(): boolean {
+    return this.justHitBall;
+  }
+
+  /**
+   * Mark that ball was hit during this action
+   */
+  markBallHit(): void {
+    this.justHitBall = true;
+  }
+
+  /**
+   * Reset action state (called when action completes)
+   */
+  private resetActionState(): void {
+    this.actionState = 'none';
+    this.actionTimerMs = 0;
+    this.justHitBall = false;
   }
 
   // ==================== Ball Interaction ====================
@@ -304,6 +377,12 @@ export class Player extends Phaser.GameObjects.Container {
             }
           });
           break;
+        case 'bump':
+          rect.setFillStyle(0x88ffff); // Cyan for bump
+          break;
+        case 'spike':
+          rect.setFillStyle(0xff88ff); // Magenta for spike
+          break;
         case 'victory':
           rect.setFillStyle(0xffff00);
           break;
@@ -343,6 +422,21 @@ export class Player extends Phaser.GameObjects.Container {
       if (this.hitCooldown <= 0) {
         this.canHit = true;
         this.hitCooldown = 0;
+      }
+    }
+
+    // Update action timer
+    if (this.actionState !== 'none') {
+      this.actionTimerMs += delta;
+      const timing = this.actionState === 'bump' ? this.BUMP_TIMING : this.SPIKE_TIMING;
+      if (this.actionTimerMs >= timing.total) {
+        this.resetActionState();
+        // Return to appropriate animation
+        if (this.isGrounded) {
+          this.playAnimation(Math.abs(this.velocityX) > 10 ? 'run' : 'idle');
+        } else {
+          this.playAnimation(this.velocityY > 0 ? 'fall' : 'jump');
+        }
       }
     }
 
@@ -432,6 +526,8 @@ export class Player extends Phaser.GameObjects.Container {
    */
   private updateAnimationState(): void {
     if (this.currentAnimation === 'hit' ||
+        this.currentAnimation === 'bump' ||
+        this.currentAnimation === 'spike' ||
         this.currentAnimation === 'victory' ||
         this.currentAnimation === 'defeat') {
       return; // Don't interrupt these animations

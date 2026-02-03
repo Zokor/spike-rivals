@@ -310,6 +310,140 @@ pixel art sprite, 32-bit video game character, mysterious aura, teal and purple 
 
 ---
 
+## Character Animation Poses
+
+Since AI generators can't create proper sprite sheets in one pass, generate each animation pose separately, then assemble them in Aseprite or similar tools.
+
+### Sprite Sheet Layout (240×128 px = 10 cols × 4 rows)
+```
+Row 0 (frames 0-9):   Idle (4) + Run start (6)
+Row 1 (frames 10-19): Jump (3) + Fall (2) + Hit (4) + empty
+Row 2 (frames 20-29): Spike (4) + Dive (3) + empty
+Row 3 (frames 30-39): Victory (4) + Defeat (2) + Serve (4)
+```
+
+### Workflow
+1. Generate each pose at 384×512 px (high res)
+2. Downscale to 24×32 px per frame
+3. Arrange frames in sprite sheet using Aseprite/Piskel
+4. Apply consistent color palette across all frames
+5. Clean up and add 1px outlines
+
+---
+
+### Animation Pose Prompts
+
+Use these base prompts, replacing `{CHARACTER}` with specific character traits.
+
+#### Idle Pose (4 frames: standing, breathe in, standing, breathe out)
+```
+pixel art sprite, 32-bit video game character, {CHARACTER}, standing idle pose, relaxed athletic stance, arms at sides, slight weight shift, side view facing right, transparent background, no antialiasing, limited 16 color palette
+```
+
+#### Run Cycle (6 frames: contact, down, passing, contact, down, passing)
+```
+pixel art sprite, 32-bit video game character, {CHARACTER}, running pose frame {1-6}, dynamic sprint cycle, arms pumping, legs in motion, side view facing right, transparent background, no antialiasing, limited 16 color palette
+```
+
+**Run frame variations:**
+- Frame 1: Right foot contact, left arm forward
+- Frame 2: Right foot push-off, body low
+- Frame 3: Right leg passing, mid-stride
+- Frame 4: Left foot contact, right arm forward
+- Frame 5: Left foot push-off, body low
+- Frame 6: Left leg passing, mid-stride
+
+#### Jump (3 frames: crouch, rise, peak)
+```
+pixel art sprite, 32-bit video game character, {CHARACTER}, jumping pose {crouch/rising/peak}, athletic vertical jump, arms raised for momentum, side view facing right, transparent background, no antialiasing, limited 16 color palette
+```
+
+**Jump frame variations:**
+- Frame 1 (Crouch): Knees bent, arms back, preparing to jump
+- Frame 2 (Rising): Legs extending, arms swinging up, leaving ground
+- Frame 3 (Peak): Fully extended, arms up, at maximum height
+
+#### Fall (2 frames: descending, landing)
+```
+pixel art sprite, 32-bit video game character, {CHARACTER}, falling pose {descending/landing}, coming down from jump, arms adjusting for balance, side view facing right, transparent background, no antialiasing, limited 16 color palette
+```
+
+**Fall frame variations:**
+- Frame 1 (Descending): Legs tucking slightly, arms out for balance
+- Frame 2 (Landing): Knees bending to absorb impact, arms forward
+
+#### Hit/Bump (4 frames: ready, windup, contact, follow-through)
+```
+pixel art sprite, 32-bit video game character, {CHARACTER}, volleyball bump pose {ready/windup/contact/follow}, underhand hit technique, arms together, side view facing right, transparent background, no antialiasing, limited 16 color palette
+```
+
+**Hit frame variations:**
+- Frame 1 (Ready): Stance ready, arms preparing
+- Frame 2 (Windup): Arms pulling back/down
+- Frame 3 (Contact): Arms making contact with ball, platform formed
+- Frame 4 (Follow-through): Arms following ball trajectory upward
+
+#### Spike (4 frames: approach, jump, arm back, smash)
+```
+pixel art sprite, 32-bit video game character, {CHARACTER}, volleyball spike pose {approach/jump/arm-back/smash}, powerful overhead attack, athletic form, side view facing right, transparent background, no antialiasing, limited 16 color palette
+```
+
+**Spike frame variations:**
+- Frame 1 (Approach): Running approach, arms swinging back
+- Frame 2 (Jump): Leaving ground, arms raised
+- Frame 3 (Arm back): In air, hitting arm cocked back
+- Frame 4 (Smash): Arm swinging down, powerful contact
+
+#### Dive (3 frames: lunge, extend, slide)
+```
+pixel art sprite, 32-bit video game character, {CHARACTER}, volleyball dive pose {lunge/extend/slide}, desperate save attempt, horizontal body, side view facing right, transparent background, no antialiasing, limited 16 color palette
+```
+
+**Dive frame variations:**
+- Frame 1 (Lunge): Pushing off, body tilting forward
+- Frame 2 (Extend): Fully horizontal, arms outstretched
+- Frame 3 (Slide): On ground, recovering
+
+#### Victory (4 frames: celebration loop)
+```
+pixel art sprite, 32-bit video game character, {CHARACTER}, victory celebration pose {1-4}, happy triumphant expression, fist pump or jump for joy, side view facing right, transparent background, no antialiasing, limited 16 color palette
+```
+
+#### Defeat (2 frames: disappointed, slump)
+```
+pixel art sprite, 32-bit video game character, {CHARACTER}, defeat pose {disappointed/slump}, sad expression, shoulders dropped, looking down, side view facing right, transparent background, no antialiasing, limited 16 color palette
+```
+
+#### Serve (4 frames: toss, reach, contact, follow)
+```
+pixel art sprite, 32-bit video game character, {CHARACTER}, volleyball serve pose {toss/reach/contact/follow}, overhand serve technique, side view facing right, transparent background, no antialiasing, limited 16 color palette
+```
+
+**Serve frame variations:**
+- Frame 1 (Toss): Ball toss, non-hitting hand releasing ball
+- Frame 2 (Reach): Arm reaching up toward ball
+- Frame 3 (Contact): Hand striking ball at peak
+- Frame 4 (Follow): Arm following through after hit
+
+---
+
+### Character-Specific Traits for {CHARACTER}
+
+Replace `{CHARACTER}` in the prompts above with these traits:
+
+| Character | {CHARACTER} Replacement |
+|-----------|------------------------|
+| **Blitz** | athletic build, spiky electric blue hair, blue and white sports outfit, determined expression, lightning bolt motif |
+| **Crusher** | muscular powerful build, short dark hair, red and black sports outfit, intimidating expression, fist motif |
+| **Sky** | tall slender build, flowing white ethereal hair, purple and cyan sports outfit, graceful serene expression, wing motifs |
+| **Zen** | medium balanced build, neat black hair, green and white minimalist outfit, calm focused expression, zen circle motif |
+| **Tank** | stocky defensive build, short hair, gray and orange sports outfit, determined protective expression, shield motif |
+| **Flash** | lean athletic build, flame-like spiky orange hair, yellow and orange sports outfit, energetic excited expression, speed lines |
+| **Nova** | medium athletic build, styled hair, pink and gold sports outfit, confident smile, star burst motif |
+| **Ghost** | slim mysterious build, flowing gray hair, teal and purple sports outfit, enigmatic expression, wispy aura effects |
+
+---
+
 ## Character Portraits
 
 Bust shot portraits showing head and shoulders. Generate at 512×512 px, then downscale to 80×80 px.
