@@ -12,7 +12,12 @@
       "Bash(bun run typecheck:client:*)",
       "Bash(npm run typecheck:*)",
       "Bash(npx tsc:*)",
-      "Bash(ln:*)"
+      "Bash(ln:*)",
+      "Bash(magick:*)",
+      "Bash(brew install:*)",
+      "Bash(ffmpeg:*)",
+      "Bash(ls:*)",
+      "Bash(sort:*)"
     ]
   }
 }

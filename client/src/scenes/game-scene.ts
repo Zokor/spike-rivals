@@ -442,9 +442,8 @@ export class GameScene extends Phaser.Scene {
     const now = this.time.now;
     if (now - this.lastHitTime[player.side] < this.HIT_COOLDOWN_MS) return;
 
-    // In CPU mode, both players must use action-based hitting windows
+    // In CPU mode, keep a simple double-hit guard
     if (this.mode === 'cpu') {
-      if (!this.isPlayerInActiveWindow(player)) return;
       if (player.justHitBall) return;
       player.justHitBall = true;
     }
@@ -1062,7 +1061,20 @@ export class GameScene extends Phaser.Scene {
    * Update player action state timer
    */
   private updatePlayerActionState(player: PlayerObject, delta: number): void {
-    if (player.actionState === 'none') return;
+    if (player.actionState === 'none') {
+      // Reset justHitBall when ball is far enough away
+      if (player.justHitBall) {
+        const dx = this.ball.x - player.sprite.x;
+        const dy = this.ball.y - player.sprite.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const playerRadius = Math.hypot(player.body.halfWidth, player.body.halfHeight);
+        const clearanceRadius = PHYSICS.BALL_RADIUS + playerRadius;
+        if (distance > clearanceRadius) {
+          player.justHitBall = false;
+        }
+      }
+      return;
+    }
 
     player.actionTimerMs += delta;
     const timing = ACTION_TIMING[player.actionState];

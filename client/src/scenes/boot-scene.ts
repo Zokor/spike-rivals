@@ -71,7 +71,7 @@ export class BootScene extends Phaser.Scene {
     // ... etc
 
     // --- Ball ---
-    const ballFrame = { frameWidth: 12, frameHeight: 12 };
+    const ballFrame = { frameWidth: 16, frameHeight: 16 };
     const ballAssetFilename = (key: string) => `${key}-spin`;
     this.load.spritesheet(
       'ball-default',

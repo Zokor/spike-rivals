@@ -1,0 +1,23 @@
+{
+  "name": "spike-rivals-comfyui",
+  "version": "1.0.0",
+  "description": "ComfyUI integration for Spike Rivals asset generation",
+  "type": "module",
+  "scripts": {
+    "generate": "bun run src/index.ts",
+    "generate:character": "bun run src/index.ts --type character",
+    "generate:background": "bun run src/index.ts --type background",
+    "generate:ball": "bun run src/index.ts --type ball",
+    "generate:portrait": "bun run src/index.ts --type portrait",
+    "test": "bun run src/index.ts --test"
+  },
+  "dependencies": {
+    "uuid": "^9.0.0",
+    "sharp": "^0.33.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/uuid": "^9.0.0",
+    "typescript": "^5.0.0"
+  }
+}

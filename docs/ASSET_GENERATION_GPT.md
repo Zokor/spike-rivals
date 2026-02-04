@@ -101,8 +101,8 @@ Urban Rooftop:
 - `client/public/assets/sprites/backgrounds/urban-rooftop/ground.png`
 
 Balls:
-- `client/public/assets/sprites/balls/{spriteKey}-spin.png` (96×12, 8 frames)
-- Sprite keys: `ball-default`, `ball-plasma`, `ball-fire`, `ball-ice`, `ball-void`, `ball-rainbow`
+- `client/public/assets/sprites/balls/{spriteKey}-spin.png` (128×16, 8 frames)
+- Sprite keys: `ball-default`, `ball-plasma`, `ball-neon`, `ball-fire`, `ball-pixel`, `ball-ice`, `ball-void`, `ball-glitch`, `ball-rainbow`
 
 UI:
 - `client/public/assets/sprites/ui/...`
@@ -338,7 +338,7 @@ Repeat this layer discipline for every stage.
 
 ---
 
-## 10) Balls (96×12, 8 rotation frames)
+## 10) Balls (128×16, 8 rotation frames)
 
 Naming rule:
 - File name must be `{spriteKey}-spin.png` (example: `ball-plasma-spin.png`)
@@ -346,7 +346,7 @@ Naming rule:
 Ball prompt template:
 ```text
 [GLOBAL STYLE HEADER]
-pixel art volleyball cosmetic ball, 12x12 readable silhouette, {THEME}, includes 8 rotation frames in a 96x12 horizontal spritesheet, crisp pixels, transparent background
+pixel art volleyball cosmetic ball, 16x16 readable silhouette, {THEME}, includes 8 rotation frames in a 128x16 horizontal spritesheet, crisp pixels, transparent background
 ```
 
 Themes:
@@ -415,7 +415,7 @@ Pick a theme and apply to 1–3 characters per drop:
 Ball skin template:
 ```text
 [GLOBAL STYLE HEADER]
-pixel art volleyball cosmetic ball, 12x12 readable silhouette, theme {THEME}, {MATERIALS}, strong outline, no gradients, includes 8 rotation frames in a 96x12 horizontal spritesheet, transparent background
+pixel art volleyball cosmetic ball, 16x16 readable silhouette, theme {THEME}, {MATERIALS}, strong outline, no gradients, includes 8 rotation frames in a 128x16 horizontal spritesheet, transparent background
 ```
 
 Net skin template:

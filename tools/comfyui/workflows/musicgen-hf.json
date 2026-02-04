@@ -1,0 +1,29 @@
+{
+  "1": {
+    "class_type": "MusicgenHFLoader",
+    "inputs": {
+      "model_name": "__MODEL_NAME__"
+    }
+  },
+  "2": {
+    "class_type": "MusicgenHFGenerate",
+    "inputs": {
+      "model": ["1", 0],
+      "text": "__PROMPT__",
+      "batch_size": 1,
+      "duration": "__DURATION__",
+      "cfg": 3.0,
+      "top_k": 250,
+      "top_p": 0.0,
+      "temperature": 1.0,
+      "seed": "__SEED__"
+    }
+  },
+  "3": {
+    "class_type": "SaveAudio",
+    "inputs": {
+      "filename_prefix": "__OUTPUT_PREFIX__",
+      "audio": ["2", 0]
+    }
+  }
+}
